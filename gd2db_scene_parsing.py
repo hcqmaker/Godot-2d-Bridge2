@@ -2,6 +2,7 @@ import bpy
 import re
 import os
 import bmesh
+import hashlib, time
 from mathutils import Vector
 from pathlib import Path
 from .gd2db_utilities import ProgressReporter
@@ -17,6 +18,7 @@ from math import (
 from .gd2db_utilities import (
     rotate_around_point,
     export_objects,
+    export_animations,
     custom_message_box
     )
 
@@ -102,6 +104,16 @@ class GodotSceneParser:
                     "children": [node_path]
                 }
 
+    
+    def append_animations(self, anims):
+        self.elements["anims"] = anims
+        pass
+    def append_animation_lib(self, data):
+        self.elements["anim_lib"] = data
+        pass
+    def append_animation_player(self, data):
+        self.elements["anim_player"] = data
+        pass
     # adds a dictionary entry to elements["ext_resource"] of the supplied resource with the resource id as the key
     def append_external_resources(self, resource):
         # use re pattern matching to find the resource's id
@@ -202,6 +214,7 @@ class GodotSceneParser:
 # parent class used to parse the node string for every element that is exported
 class ObjectToExport:
     exportable_objects = ()
+    export_animations = ()
     pixels = 0
     existing_ids = []
 
@@ -226,6 +239,8 @@ class ObjectToExport:
         cls.exportable_objects = list(export_objects())
         cls.pixels = bpy.context.scene.godot_2d_bridge_tools.pixels_per_unit
         cls.existing_ids = list(parsing_instance.elements["ext_resource"].keys())
+
+        cls.export_animations = list(export_animations(cls.exportable_objects))
 
         if cls.gd_scene_format == 1:
             cls.vector_array_key = "Vector2Array"
@@ -414,7 +429,7 @@ class MeshObjectParser(ObjectToExport):
 
     # will save the image that is currently named in the gd2db_texture_image property of the mesh object, if any, and
     # calculate the appropriate resource id for the external resource
-    def save_texture(self, scene_path, parsing_instance):
+    def save_texture(self, scene_path, parsing_instance, root_path = None):
 
         # get the image object, the full name of the image file, and calculate the filepath to save the image to
         image = bpy.data.images[self.obj.gd2db_texture_image]
@@ -425,7 +440,9 @@ class MeshObjectParser(ObjectToExport):
 
         # get the resource path string
         # used to check if the resource already exists in the scene and to parse new resource lines
-        self.resource_path = f"res://GD2DB_textures/{image_filename}"
+        if (root_path == None):
+            root_path = ''
+        self.resource_path = f"res://{root_path}GD2DB_textures/{image_filename}"
 
         # check if the external resource already exists as a dictionary entry and assign the key to self.resource_id
         for key, value in parsing_instance.elements["ext_resource"].items():
@@ -795,9 +812,119 @@ class ArmatureObjectParser(ObjectToExport):
             f"{angle_line}"
         )
 
+class AnimationsParser():
+    def __init__(self):
+        super().__init__()
+
+        self.anim_ids = []
+        self.anim_lib_id = ""
+        self.anim_player = ""
+
+        pass
+
+    def anim_to_string(self, anim_name, anim_dict, key):
+        # f"[sub_resource type=\"Animation\" id="Animation_kl7yp"]"
+        anim_id = "Animation_" + key
+        self.anim_ids.append({"name":anim_name,"id":anim_id})
+
+        rs = [
+            f"[sub_resource type=\"Animation\" id=\"{anim_id}\" ]"
+        ]
+
+        ii = 0
+        for node_path in anim_dict:
+            frames = anim_dict[node_path]
+
+            frame_times = []
+            frame_rots = []
+            trans = []
+
+            for frame_obj in frames:
+                frame = frame_obj["frame"]
+                rot = frame_obj["rot"]
+
+                frame_times.append(frame)
+                frame_rots.append(rot)
+                trans.append(1)
+
+            rs.append(f"tracks/{ii}/type = \"value\"")
+            rs.append(f"tracks/{ii}/imported = false")
+            rs.append(f"tracks/{ii}/enabled = true")
+            rs.append(f"tracks/{ii}/path = NodePath(\"{node_path}\")")
+            rs.append(f"tracks/{ii}/interp = 1")
+            rs.append(f"tracks/{ii}/loop_wrap = true")
+            rs.append("tracks/"+str(ii)+"/keys = {")
+            rs.append(f"\"times\": PackedFloat32Array({",".join(frame_times)}),")
+            rs.append(f"\"transitions\": PackedFloat32Array({",".join(trans)}),")
+            rs.append(f"\"update\": 0,")
+            rs.append(f"\"values\": [{",".join(frame_rots)}]")
+            rs.append("}")
+
+            ii += 1
+
+        return rs
+
+    def to_library(self, key):
+        self.anim_lib_id = f"AnimationLibrary_{key}"
+        rs = [
+            f"[sub_resource type=\"AnimationLibrary\" id=\"{self.anim_lib_id}\"]"
+                " _data = {"
+            ]
+
+        num = len(self.anim_ids)
+        for i,anim_obj in self.anim_ids:
+
+            anim_name = anim_obj["name"]
+            anim_id = anim_obj["id"]
+
+            tmp = f" &\"{anim_name}\": SubResource(\"{anim_id}\")"
+            if (i != (num - 1)):
+                tmp += ","
+            rs.append(tmp)
+        
+        rs.append(" }")
+        return rs
+
+    def to_player(self):
+       rs = [
+           " [node name=\"AnimationPlayer\" type=\"AnimationPlayer\" parent=\".\" ]"
+           " callback_mode_process = 0"
+           " libraries/ = SubResource(\"{self.anim_lib_id}\")"
+        ]
+       return rs
+
+
+# tracks/4/type = "value"
+# tracks/4/imported = false
+# tracks/4/enabled = true
+# tracks/4/path = NodePath("Skeleton2D/Root/Middle:rotation")
+# tracks/4/interp = 1
+# tracks/4/loop_wrap = true
+# tracks/4/keys = {
+# "times": PackedFloat32Array(0, 0.041666668, 0.083333336, 0.125, 0.16666667, 0.20833333, 0.25, 0.29166666, 0.33333334, 0.375, 0.41666666, 0.45833334, 0.5, 0.5416667, 0.5833333, 0.625, 0.6666667, 0.7083333, 0.75, 0.7916667, 0.8333333, 0.875, 0.9166667, 0.9583333, 1),
+# "transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+# "update": 0,
+# "values": [0.0, 0.0, 0.00157079632679489, 0.00558505360638185, 0.011693705988362, 0.01919862177193762, 0.02757620218151041, 0.03630284844148206, 0.04468042885105484, 0.05218534463463045, 0.0582939970166106, 0.06248278722139699, 0.06387905062299247, 0.06265732014659643, 0.05916666164260777, 0.05393067388662478, 0.04729842272904633, 0.03996803987067014, 0.03193952531149623, 0.02408554367752174, 0.01658062789394613, 0.00994837673636767, 0.00471238898038469, 0.00122173047639603, 0.0]
+# }
+
+#         [sub_resource type="AnimationLibrary" id="AnimationLibrary_iefm8"]
+# _data = {
+# &"Idle": SubResource("Animation_kl7yp"),
+# &"RESET": SubResource("Animation_xkydt"),
+# &"Run": SubResource("Animation_fn7wb")
+# }
+
+# [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1497862076]
+# callback_mode_process = 0
+# libraries/ = SubResource("AnimationLibrary_iefm8")
+
+        
+
 
 # uses data gathered by the previous classes to write a new *.tscn file
 def write_godot_scene(new_file_path):
+
+    
 
     # instantiate GodotSceneParser and get the initial elements of the scene to be built
     parsing_instance = GodotSceneParser()
@@ -934,3 +1061,172 @@ def write_godot_scene(new_file_path):
             new_godot_scene.write(f"{element}\n")
     reporting_instance.end_sub_job()
     return True
+
+
+
+def write_godot_scene_47(root_path, new_file_path):
+
+    tmp_root_path = root_path.replace("\\","/")  + "/"
+    tmp_new_file_path = new_file_path.replace("\\","/")
+    tmp_dir_path = os.path.dirname(tmp_new_file_path)
+
+    tmp_texture_root = ''
+    if (tmp_dir_path.container(tmp_root_path)):
+        tmp_texture_root = tmp_dir_path.replace(tmp_root_path, '')
+    bpy.context.scene.godot_2d_bridge_tools.godot_version = 9
+
+
+    # instantiate GodotSceneParser and get the initial elements of the scene to be built
+    parsing_instance = GodotSceneParser()
+    parsing_instance.initialize_scene_elements()
+
+    # give a warning message and return if the user is attempting to add elements in a different formate from the
+    # original scene
+    if parsing_instance.gd_scene_format != parsing_instance.get_gd_scene_format():
+        custom_message_box(
+            message="You are attempting to export objects to a scene "
+                    "with a different format than the selected Godot version.",
+            title="Export Canceled!",
+            icon="CANCEL",
+        )
+        return False
+
+    # called after instantiation of GodotSceneParser to use data from the elements variable
+    ObjectToExport.setup(parsing_instance)
+
+    # iterate through the objects being exported and parse their nodes
+    for obj in ObjectToExport.exportable_objects:
+        print("\n")
+        job_name = f"Parsing \"{obj.name}\" Node"
+
+        # check if the object is a mesh or an armature to determine what type of parser to use
+        if obj.type == 'MESH':
+            object_parser = MeshObjectParser(obj)
+
+            # build the list of job titles and calculate there totals
+            sub_jobs = [
+                "Parsing Node2D Nodes",
+                "Building Vertex Index Map",
+                "Building Loop Index Map",
+                "Gathering Vertex Data",
+                "Building Polygons"
+            ]
+            sub_job_totals = [
+                len(object_parser.collections),
+                len(obj.data.vertices),
+                len(obj.data.loops),
+                len(obj.data.vertices),
+                len(obj.data.polygons)
+            ]
+
+            # remove the loop index map job if there are no uv layers
+            if not obj.data.uv_layers:
+                del sub_jobs[2]
+                del sub_job_totals[2]
+
+            # instantiate the ProgressReporter and apply that instance to the object_parser
+            reporting_instance = ProgressReporter(job_name, sub_jobs, sub_job_totals)
+            object_parser.get_reporting_instance(reporting_instance)
+
+            # iterate through the collections this object is a child of and parse the "Node2D" node
+            reporting_instance.start_sub_job()
+            for collection in object_parser.collections:
+                reporting_instance.update()
+                reporting_instance.adjust_update_rate()
+
+                collection_parser_instance = CollectionObjectParser(collection)
+                parsing_instance.append_nodes(collection_parser_instance.node2d())
+
+            reporting_instance.end_sub_job()
+
+            # save the texture and parse the external resource if an image exists for this mesh
+            if obj.gd2db_texture_image != "None":
+                object_parser.save_texture(new_file_path, parsing_instance, tmp_texture_root)
+                parsing_instance.append_external_resources(object_parser.external_resource())
+
+            # parse the Polygon2D node
+            parsing_instance.append_nodes(object_parser.polygon2d_node())
+
+        if obj.type == 'ARMATURE':
+            object_parser = ArmatureObjectParser(obj)
+
+            # build the list of job titles, calculate there totals, and instantiate the ProgressReporter
+            sub_jobs = [
+                "Parsing Node2D Nodes",
+                "Parsing Bone2D Nodes"
+            ]
+            sub_job_totals = [
+                len(object_parser.collections),
+                len(obj.pose.bones)
+            ]
+            reporting_instance = ProgressReporter(job_name, sub_jobs, sub_job_totals)
+
+            # iterate through the collections this object is a child of and parse the "Node2D" node
+            reporting_instance.start_sub_job()
+            for collection in object_parser.collections:
+                reporting_instance.update()
+                reporting_instance.adjust_update_rate()
+                collection_parser_instance = CollectionObjectParser(collection)
+                parsing_instance.append_nodes(collection_parser_instance.node2d())
+            reporting_instance.end_sub_job()
+
+            # parse the Skeleton2D node and append it to the parsing_instance
+            parsing_instance.append_nodes(object_parser.skeleton2d_node())
+
+            # iterate through the bones in this armature and parse the "Bone2D" node
+            reporting_instance.start_sub_job()
+            for bone in obj.pose.bones:
+                reporting_instance.update()
+                reporting_instance.adjust_update_rate()
+                parsing_instance.append_nodes(object_parser.bone2d_node(bone))
+            reporting_instance.end_sub_job()
+
+    # export Animations
+    tmp_anim_dict = ObjectToExport.export_animations
+    if (len(tmp_anim_dict) > 0):
+
+        def _get_key():
+            dt = int(time.time() * 1000)
+            return hashlib.md5(str(dt).encode(encoding='UTF-8')).hexdigest()[:5]
+
+
+        object_parser = AnimationsParser()
+        for anim_obj_name in tmp_anim_dict: 
+            tmp_anims = tmp_anim_dict[anim_obj_name]
+            parsing_instance.append_animations(object_parser.anim_to_string(anim_obj_name, tmp_anims, _get_key()))
+
+        parsing_instance.append_animation_lib(object_parser.to_library( _get_key()))
+        parsing_instance.append_animation_player(object_parser.to_player())
+        
+
+    # parse the name of the new file, build the list of job titles, and calculate there totals
+    new_file = new_file_path.split(os.sep)[-1]
+    sub_jobs = [
+        "Sort and Finalize Resources",
+        "Sort and Finalize Nodes",
+        f"Writing Scene Elements to \"{new_file}\""
+    ]
+    sub_job_totals = [
+        len(parsing_instance.elements["ext_resource"]),
+        len(parsing_instance.elements["node"]),
+        sum([len(x) for x in parsing_instance.elements.values()])
+    ]
+
+    print("\n")
+    reporting_instance = ProgressReporter(f"Finalizing Scene", sub_jobs, sub_job_totals)
+    parsing_instance.get_reporting_instance(reporting_instance)
+
+    # sort and finalize the nodes and external resources of the scene
+    parsing_instance.sort_finalize_external_resources()
+    parsing_instance.sort_finalize_nodes()
+
+    # create the *.tscn file and write the elements from the parsing_instance to the file
+    reporting_instance.start_sub_job()
+    elements = [parsing_instance.parse_file_descriptor()] + sum(parsing_instance.elements.values(), [])
+    with open(new_file_path, "w") as new_godot_scene:
+        for element in elements:
+            reporting_instance.update()
+            new_godot_scene.write(f"{element}\n")
+    reporting_instance.end_sub_job()
+    return True
+    pass

@@ -1,7 +1,9 @@
 import bpy
+import json,os
+from mathutils import Vector, Matrix, Quaternion
 from time import perf_counter
 
-from bpy_types import (
+from bpy.types import (
     Operator,
     PropertyGroup
 )
@@ -106,7 +108,11 @@ class Godot2dBridgeProperties(PropertyGroup):
         description="Chose the version of Godot to export the scene for",
         default="7"
     )
-
+    export_root: StringProperty(
+        name="",
+        default="",
+        description="export godot scene root use for operator path for texture"
+    )
 
 # returns a "2d" coordinate constrained to the min and max coordinates
 def normalize_2d_coordinates(co, min_co, max_co):
@@ -411,6 +417,216 @@ class GODOT_2D_BRIDGE_OT_export(Operator, ExportHelper):
         # use the gd2db_scene_parsing module to write a new *.tscn file
         # noinspection PyUnresolvedReferences
         export_success = write_godot_scene(self.filepath)
+
+        if export_success:
+            # parse the list of exported objects
+            exported_list = [f"\"{x.name}\"" for x in export_objects()]
+            if len(exported_list) > 2:
+                exported_list = ", ".join(exported_list[0:-1]), exported_list[-1]
+                exported_list = f"{exported_list[0]}, and {exported_list[1]}"
+            elif len(exported_list) > 1:
+                exported_list = f"{exported_list[0]} and {exported_list[1]}"
+            else:
+                exported_list = exported_list[0]
+
+            # generate a successful export popup indicating the objects exported and the elapsed time for export process
+            custom_message_box(
+                message=f"{exported_list} successfully exported in {perf_counter() - export_start_time:05.2f}s.",
+                title="Success!",
+                icon='INFO'
+            )
+        return {'FINISHED'}
+
+
+def _inline_set_view(mode):
+    # print("model:", mode)
+    if mode == "2D":
+        for screen in bpy.data.screens:
+            for area in screen.areas:
+                if area.type == "VIEW_3D":
+                    active_space_data = area.spaces[0]
+                    if active_space_data != None:
+                        if hasattr(active_space_data, "region_3d"):
+                            bpy.ops.view3d.view_axis(
+                                type="TOP",
+                                align_active=False,
+                                relative=False,
+                            )
+
+    elif mode == "3D":
+        for screen in bpy.data.screens:
+            for area in screen.areas:
+                if area.type == "VIEW_3D":
+                    active_space_data = area.spaces[0]
+                    if active_space_data != None:
+                        if hasattr(active_space_data, "region_3d"):
+                            region_3d = active_space_data.region_3d
+                            region_3d.view_perspective = "PERSP"
+
+
+def _inline_set_middle_mouse_move(enable):
+    km = bpy.context.window_manager.keyconfigs.addon.keymaps["3D View"]
+    km.keymap_items["view3d.move"].active = enable
+
+
+class GODOT_2D_BRIDGE_OT_2d_view(Operator):
+    bl_label = "2D/3D View"
+    bl_idname = "gd2db.set_2d_view"
+    bl_options = {'REGISTER'}
+    bl_description = "set 2d/3d veiw"
+
+    view2d:BoolProperty(name="2D/3D View",default=False,
+            description="Export selected objects only")
+
+    def execute(self, context):
+        is_2dview = not self.view2d
+        self.view2d = is_2dview
+
+        _inline_set_view("2D" if is_2dview else "3D")
+        _inline_set_middle_mouse_move(True if is_2dview else False)
+
+        return {'FINISHED'}
+
+def _inline_add_img(path, sprite_name, parent):
+    bpy.ops.object.empty_image_add(filepath=path,align="VIEW",name=sprite_name)
+    img = bpy.context.object
+    img.name = sprite_name
+    img.parent = parent
+    return img
+
+def _inline_link_object(obj):
+    # bpy.context.scene.collection
+    active_collection = bpy.context.collection
+    active_collection.objects.link(obj)
+    return obj
+
+class GODOT_2D_BRIDGE_OT_import_sprites(Operator, ImportHelper):
+    bl_label = "Import Sprites"
+    bl_idname = "gd2db.import_sprites"
+    bl_options = {'REGISTER', "UNDO"}
+    bl_description = "Chose json file"
+
+    filter_glob: StringProperty(default="*.json", options={'HIDDEN'})
+
+    def execute(self, context):
+
+        scene_scale = bpy.context.scene.unit_settings.scale_length
+        pixels_per_unit = context.scene.godot_2d_bridge_tools.pixels_per_unit
+        tmp_scale = 1.0/pixels_per_unit
+        tmp_file_path = self.filepath
+        tmp_file_path = tmp_file_path.replace("\\", "/")
+
+        # noinspection PyUnresolvedReferences
+        data_file = open(tmp_file_path)
+        sprite_data = json.load(data_file)
+        data_file.close()
+        # print(sprite_data)
+
+        ext = os.path.splitext(tmp_file_path)[1]
+        folder = os.path.dirname(tmp_file_path)
+
+        for object in bpy.context.selected_objects:
+            object.select_set(False)
+
+        sprite_object = context.object
+        if not sprite_object:
+            bpy.ops.object.empty_add(location=(0,0,0))
+            empty_node = bpy.context.object
+            sprite_object = empty_node
+            
+   
+        if "name" in sprite_data:
+            sprite_object.name = sprite_data["name"]
+
+        if "nodes" in sprite_data:
+            for i, sprite in enumerate(sprite_data["nodes"]):
+                tmp_sprite_name = sprite["name"]
+                tmp_img_filepath = os.path.join(folder, sprite["resource_path"])
+                # print(tmp_img_filepath)
+                pos = [sprite["position"][0], sprite["position"][1], sprite["z"]]
+                offset = [sprite["offset"][0], sprite["offset"][1], 0]
+                
+                pos_offset = (
+                    Vector((pos[0], -pos[1], pos[2])) * tmp_scale
+                    + Vector((offset[0], offset[1], offset[2])) * tmp_scale
+                )
+
+                if os.path.exists(tmp_img_filepath):
+                    
+                    for image in bpy.data.images:
+                        if os.path.exists(bpy.path.abspath(image.filepath)) and os.path.exists(tmp_img_filepath):
+                            if os.path.samefile(bpy.path.abspath(image.filepath), tmp_img_filepath):
+                                img = image
+                                img.reload()
+                                break
+
+                    if not (tmp_sprite_name in bpy.context.visible_objects):
+                        img_obj = None
+                        if not (tmp_sprite_name in bpy.data.objects):
+                            img_obj = _inline_add_img(tmp_img_filepath, tmp_sprite_name, sprite_object)
+                        else:
+                            img_obj = bpy.data.objects[tmp_sprite_name]
+                            _inline_link_object(img_obj)
+                            img_obj.parent = sprite_object
+
+                        in_img = img_obj.data
+                        sz = in_img.size
+                        img_w = sz[0]
+                        img_h = sz[1]
+
+                        tmp_scale_y = img_h / img_w
+                        target_phys_width = img_w * tmp_scale
+                        final_display_size = (target_phys_width / 2) / scene_scale
+                        
+                        img_obj.scale = (1.0, tmp_scale_y, 1.0)
+                        bpy.ops.object.transform_apply(location=False, scale=True, properties=False)
+                        img_obj.empty_display_size = final_display_size + 5
+
+                        img_obj.empty_image_offset = [0, -1]
+                        img_obj.location = pos_offset
+
+                        print(tmp_sprite_name, sprite["z"], pos_offset)
+
+                else:
+                    print("not found:", tmp_img_filepath)
+        context.scene.view_layers[0].objects.active = sprite_object
+
+        bpy.ops.view3d.view_axis(type="TOP", align_active=False, relative=False)
+        bpy.ops.ed.undo_push(message="Sprite Import")
+
+
+        return {'FINISHED'}
+
+class GODOT_2D_BRIDGE_OT_export_root(Operator, ImportHelper):
+    bl_label = "Godot Export Root"
+    bl_idname = "gd2db.export_root"
+    bl_options = {'REGISTER', "UNDO"}
+    bl_description = "Chose path "
+
+    filter_glob: StringProperty(default="", options={'HIDDEN'})
+
+    def execute(self, context):
+        # noinspection PyUnresolvedReferences
+        context.scene.godot_2d_bridge_tools.export_root = self.filepath
+        return {'FINISHED'}
+
+class GODOT_2D_BRIDGE_OT_export_47(Operator, ExportHelper):
+    bl_label = "Export Godot 4.7"
+    bl_idname = "gd2db.export_47"
+    bl_description = "Export objects to a *.tscn file"
+
+    # set the filename extension and filter for ExportHelper
+    filename_ext = ".tscn"
+    filter_glob: StringProperty(default="*.tscn", options={'HIDDEN'})
+
+    def execute(self, _context):
+        # get the start time of the export process
+        export_start_time = perf_counter()
+
+        # use the gd2db_scene_parsing module to write a new *.tscn file
+        # noinspection PyUnresolvedReferences
+        tmp_root_path = _context.scene.godot_2d_bridge_tools.export_root
+        export_success = write_godot_scene_47(tmp_root_path, self.filepath)
 
         if export_success:
             # parse the list of exported objects

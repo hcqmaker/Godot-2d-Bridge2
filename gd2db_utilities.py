@@ -6,6 +6,9 @@ import bpy
 from time import perf_counter
 from sys import stdout
 
+from mathutils import Matrix, Euler
+from math import degrees
+
 
 # prints out a progress bar of a job and a series of sub-jobs to the console, and uses Blender's window manager to show
 # the jobs total progress at the cursor
@@ -165,6 +168,216 @@ def export_objects():
         )
     return exportable_objects
 
+def _write_recursive_nodes(in_serialized_names, in_children, bone_name, indent):
+    my_children = in_children[bone_name]
+    if my_children:
+        for child_bone in my_children:
+            in_serialized_names.append(child_bone)
+            _write_recursive_nodes(in_serialized_names, in_children, child_bone, indent + 1)
+
+def _get_node_path(obj, pose_bone):
+    parents = []
+    parents += [obj.name] + [x.name for x in reversed(pose_bone.parent_recursive)]
+    parents = "/".join(parents)
+    return parents
+
+def ensure_rot_order(rot_order_str):
+    if set(rot_order_str) != {'X', 'Y', 'Z'}:
+        rot_order_str = "XYZ"
+    return rot_order_str
+
+class DecoratedBone:
+    __slots__ = (
+        # Bone name, used as key in many places.
+        "name",
+        # path name
+        "node_path",
+        "parent",  # decorated bone parent, set in a later loop
+        # Blender armature bone.
+        "rest_bone",
+        # Blender pose bone.
+        "pose_bone",
+        # Blender pose matrix.
+        "pose_mat",
+        # Blender rest matrix (armature space).
+        "rest_arm_mat",
+        # Blender rest matrix (local space).
+        "rest_local_mat",
+        # Pose_mat inverted.
+        "pose_imat",
+        # Rest_arm_mat inverted.
+        "rest_arm_imat",
+        # Rest_local_mat inverted.
+        "rest_local_imat",
+        # Last used euler to preserve euler compatibility in between keyframes.
+        "prev_euler",
+        # Is the bone disconnected to the parent bone?
+        "skip_position",
+        "rot_order",
+        "rot_order_str",
+        # Needed for the euler order when converting from a matrix.
+        "rot_order_str_reverse",
+    )
+
+    _eul_order_lookup = {
+        'XYZ': (0, 1, 2),
+        'XZY': (0, 2, 1),
+        'YXZ': (1, 0, 2),
+        'YZX': (1, 2, 0),
+        'ZXY': (2, 0, 1),
+        'ZYX': (2, 1, 0),
+    }
+
+    def __init__(self, arm, obj, rotate_mode, root_transform_only, node_path,bone_name):
+        self.name = bone_name
+        self.node_path = node_path
+        self.rest_bone = arm.bones[bone_name]
+        self.pose_bone = obj.pose.bones[bone_name]
+
+        if rotate_mode == "NATIVE":
+            self.rot_order_str = ensure_rot_order(self.pose_bone.rotation_mode)
+        else:
+            self.rot_order_str = rotate_mode
+        self.rot_order_str_reverse = self.rot_order_str[::-1]
+
+        self.rot_order = DecoratedBone._eul_order_lookup[self.rot_order_str]
+
+        self.pose_mat = self.pose_bone.matrix
+
+        # mat = self.rest_bone.matrix  # UNUSED
+        self.rest_arm_mat = self.rest_bone.matrix_local
+        self.rest_local_mat = self.rest_bone.matrix
+
+        # inverted mats
+        self.pose_imat = self.pose_mat.inverted()
+        self.rest_arm_imat = self.rest_arm_mat.inverted()
+        self.rest_local_imat = self.rest_local_mat.inverted()
+
+        self.parent = None
+        self.prev_euler = Euler((0.0, 0.0, 0.0), self.rot_order_str_reverse)
+        self.skip_position = ((self.rest_bone.use_connect or root_transform_only) and self.rest_bone.parent)
+
+    def update_posedata(self):
+        self.pose_mat = self.pose_bone.matrix
+        self.pose_imat = self.pose_mat.inverted()
+
+    def __repr__(self):
+        if self.parent:
+            return "[\"%s\" child on \"%s\"]\n" % (self.name, self.parent.name)
+        else:
+            return "[\"%s\" root bone]\n" % (self.name)
+
+
+
+def export_animations(objs):
+    ### this animation export code see addons_core/io_anim_bvh/export_bvh.py
+    scene = bpy.context.scene
+    frame_current = scene.frame_current
+
+    frame_start = scene.frame_start
+    frame_end = scene.frame_end
+
+        
+    print("MOTION\n")
+    print("Frames: %d\n" % (frame_end - frame_start + 1))
+    print("Frame Time: %.6f\n" % (1.0 / (scene.render.fps / scene.render.fps_base)))
+
+    frame_time = (1.0 / (scene.render.fps / scene.render.fps_base))
+
+    global_scale=1.0
+    rotate_mode='NATIVE'
+    root_transform_only=False
+    sort_children_by_names=False
+
+    tmp_animations = {}
+
+    for obj in objs:
+        if obj.type == 'ARMATURE':
+
+            tmp_tracks = []
+
+            arm = obj.data
+            
+            children = {None: []}
+            serialized_names = []
+
+            for bone in arm.bones:
+                children[bone.name] = []
+            for bone in arm.bones:
+                children[getattr(bone.parent, "name", None)].append(bone.name)
+            if sort_children_by_names is True:
+                for val in children.values():
+                    val.sort()
+            if len(children[None]) == 1:
+                key = children[None][0]
+                serialized_names.append(key)
+                indent = 0
+
+                _write_recursive_nodes(serialized_names, children, key, indent)
+
+            bones_decorated = []
+            # bones_decorated = [DecoratedBone(arm, obj, rotate_mode, root_transform_only, sort_children_by_names, bone_name) for bone_name in serialized_names]
+            for bone_name in serialized_names:
+                pose_bone = obj.pose.bones[bone_name]
+                # bone = arm.bones[bone_name]
+                tmp_node_path = _get_node_path(obj, pose_bone)
+                bones_decorated.append(DecoratedBone(arm, obj, rotate_mode, root_transform_only, sort_children_by_names, tmp_node_path, bone_name))
+            # Assign parents
+            bones_decorated_dict = {dbone.name: dbone for dbone in bones_decorated}
+            for dbone in bones_decorated:
+                parent = dbone.rest_bone.parent
+                if parent:
+                    dbone.parent = bones_decorated_dict[parent.name]
+            del bones_decorated_dict
+
+            for frame in range(frame_start, frame_end + 1):
+                scene.frame_set(frame)
+
+                for dbone in bones_decorated:
+                    dbone.update_posedata()
+
+                for dbone in bones_decorated:
+                    tmp_node_path = dbone.node_path
+                    trans = Matrix.Translation(dbone.rest_bone.head_local)
+                    itrans = Matrix.Translation(-dbone.rest_bone.head_local)
+
+                    if dbone.parent:
+                        mat_final = dbone.parent.rest_arm_mat @ dbone.parent.pose_imat @ dbone.pose_mat @ dbone.rest_arm_imat
+                        mat_final = itrans @ mat_final @ trans
+                        loc = mat_final.to_translation() + (dbone.rest_bone.head_local - dbone.parent.rest_bone.head_local)
+                    else:
+                        mat_final = dbone.pose_mat @ dbone.rest_arm_imat
+                        mat_final = itrans @ mat_final @ trans
+                        loc = mat_final.to_translation() + dbone.rest_bone.head
+
+                    # keep eulers compatible, no jumping on interpolation.
+                    rot = mat_final.to_euler(dbone.rot_order_str_reverse, dbone.prev_euler)
+
+                    ###------------------- bone rotation -----------
+                    ### x,y,z, only need rotation y
+                    if (not hasattr(tmp_tracks, tmp_node_path)):
+                            tmp_tracks[tmp_node_path] = []
+                    if not dbone.skip_position:
+                        print("%.6f %.6f %.6f " % (loc * global_scale)[:])
+
+                    print(
+                        "%.6f %.6f %.6f " % (
+                            degrees(rot[dbone.rot_order[0]]),
+                            degrees(rot[dbone.rot_order[1]]),
+                            degrees(rot[dbone.rot_order[2]]),
+                        )
+                    )
+                    tmp_tracks[tmp_node_path].append({"frame":(frame * frame_time), "rot": degrees(rot[dbone.rot_order[1]])})
+
+                    dbone.prev_euler = rot
+
+                print("\n")
+
+            tmp_animations[obj.name] = tmp_tracks
+
+    scene.frame_set(frame_current)
+
+    return tmp_animations
 
 # creates a popup based on it's arguments
 def custom_message_box(message="", title="Message Box", icon='INFO'):

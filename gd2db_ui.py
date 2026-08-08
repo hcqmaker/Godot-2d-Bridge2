@@ -1,4 +1,4 @@
-from bpy_types import Panel
+from bpy.types import Panel
 from .gd2db_utilities import export_objects
 
 
@@ -80,3 +80,18 @@ class GODOT_2D_BRIDGE_PT_export_panel(Panel):
         if not list(export_objects()) or context.mode != 'OBJECT':
             row.enabled = False
         row.operator("gd2db.export")
+
+
+        box = self.layout.box()
+        row = box.row(align=True)
+        row.operator("gd2db.set_2d_view")
+        row = box.row(align=True)
+        row.operator("gd2db.import_sprites")
+        row = box.row(align=True)
+        row.label(text="Godot Export Root Path:")
+        row = box.row(align=True)
+        row.prop(context.scene.godot_2d_bridge_tools, "export_root")
+        row.operator("gd2db.export_root")
+        row = box.row(align=True)
+        row.operator("gd2db.export_47")
+        
