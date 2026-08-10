@@ -88,10 +88,12 @@ class GODOT_2D_BRIDGE_PT_export_panel(Panel):
         row = box.row(align=True)
         row.operator("gd2db.import_sprites")
         row = box.row(align=True)
-        row.label(text="Godot Export Root Path:")
+        row.label(text="Godot res:// Path:")
         row = box.row(align=True)
         row.prop(context.scene.godot_2d_bridge_tools, "export_root")
         row.operator("gd2db.export_root")
+        row = box.row(align=True)
+        row.prop(context.scene.godot_2d_bridge_tools, "all_in_one")
         row = box.row(align=True)
         row.operator("gd2db.export_47")
         

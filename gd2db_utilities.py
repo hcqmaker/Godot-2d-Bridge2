@@ -168,18 +168,17 @@ def export_objects():
         )
     return exportable_objects
 
-def _write_recursive_nodes(in_serialized_names, in_children, bone_name, indent):
+def _inline_write_recursive_nodes(in_serialized_names, in_children, bone_name, indent):
     my_children = in_children[bone_name]
     if my_children:
         for child_bone in my_children:
             in_serialized_names.append(child_bone)
-            _write_recursive_nodes(in_serialized_names, in_children, child_bone, indent + 1)
+            _inline_write_recursive_nodes(in_serialized_names, in_children, child_bone, indent + 1)
 
-def _get_node_path(obj, pose_bone):
-    parents = []
-    parents += [obj.name] + [x.name for x in reversed(pose_bone.parent_recursive)]
-    parents = "/".join(parents)
-    return parents
+def _inline_get_node_path(arm_name, bone_name, pose_bone):
+    tmp_paths = []
+    tmp_paths += [arm_name] + [x.name for x in reversed(pose_bone.parent_recursive)] + [bone_name]
+    return "/".join(tmp_paths)
 
 def ensure_rot_order(rot_order_str):
     if set(rot_order_str) != {'X', 'Y', 'Z'}:
@@ -228,10 +227,10 @@ class DecoratedBone:
         'ZYX': (2, 1, 0),
     }
 
-    def __init__(self, arm, obj, rotate_mode, root_transform_only, node_path,bone_name):
+    def __init__(self, obj, rotate_mode, root_transform_only, node_path,bone_name):
         self.name = bone_name
         self.node_path = node_path
-        self.rest_bone = arm.bones[bone_name]
+        self.rest_bone = obj.data.bones[bone_name]
         self.pose_bone = obj.pose.bones[bone_name]
 
         if rotate_mode == "NATIVE":
@@ -277,9 +276,10 @@ def export_animations(objs):
     frame_start = scene.frame_start
     frame_end = scene.frame_end
 
+    pixels_per_unit = scene.godot_2d_bridge_tools.pixels_per_unit
         
-    print("MOTION\n")
-    print("Frames: %d\n" % (frame_end - frame_start + 1))
+    print("MOTION")
+    print("Frames: %d" % (frame_end - frame_start + 1))
     print("Frame Time: %.6f\n" % (1.0 / (scene.render.fps / scene.render.fps_base)))
 
     frame_time = (1.0 / (scene.render.fps / scene.render.fps_base))
@@ -292,36 +292,37 @@ def export_animations(objs):
     tmp_animations = {}
 
     for obj in objs:
+        # print("=====>", obj.name, obj.type)
         if obj.type == 'ARMATURE':
-
-            tmp_tracks = []
-
-            arm = obj.data
-            
+            obj_name = obj.name
+            tmp_tracks = {}
             children = {None: []}
             serialized_names = []
 
-            for bone in arm.bones:
+            bones_data = obj.data.bones
+            bones_pose_data = obj.pose.bones
+    
+            for bone in bones_data:
                 children[bone.name] = []
-            for bone in arm.bones:
+            for bone in bones_data:
                 children[getattr(bone.parent, "name", None)].append(bone.name)
+            # print("lines:", children)
             if sort_children_by_names is True:
                 for val in children.values():
                     val.sort()
+
             if len(children[None]) == 1:
                 key = children[None][0]
                 serialized_names.append(key)
                 indent = 0
 
-                _write_recursive_nodes(serialized_names, children, key, indent)
+                _inline_write_recursive_nodes(serialized_names, children, key, indent)
 
             bones_decorated = []
-            # bones_decorated = [DecoratedBone(arm, obj, rotate_mode, root_transform_only, sort_children_by_names, bone_name) for bone_name in serialized_names]
             for bone_name in serialized_names:
-                pose_bone = obj.pose.bones[bone_name]
-                # bone = arm.bones[bone_name]
-                tmp_node_path = _get_node_path(obj, pose_bone)
-                bones_decorated.append(DecoratedBone(arm, obj, rotate_mode, root_transform_only, sort_children_by_names, tmp_node_path, bone_name))
+                pose_bone = bones_pose_data[bone_name]
+                tmp_node_path = _inline_get_node_path(obj_name, bone_name, pose_bone)
+                bones_decorated.append(DecoratedBone(obj, rotate_mode, root_transform_only, tmp_node_path, bone_name))
             # Assign parents
             bones_decorated_dict = {dbone.name: dbone for dbone in bones_decorated}
             for dbone in bones_decorated:
@@ -355,25 +356,30 @@ def export_animations(objs):
 
                     ###------------------- bone rotation -----------
                     ### x,y,z, only need rotation y
-                    if (not hasattr(tmp_tracks, tmp_node_path)):
-                            tmp_tracks[tmp_node_path] = []
-                    if not dbone.skip_position:
-                        print("%.6f %.6f %.6f " % (loc * global_scale)[:])
+                    tmp_node_path_rot = tmp_node_path + ":rotation"
+                    tmp_node_path_loc = tmp_node_path + ":position"
 
-                    print(
-                        "%.6f %.6f %.6f " % (
-                            degrees(rot[dbone.rot_order[0]]),
-                            degrees(rot[dbone.rot_order[1]]),
-                            degrees(rot[dbone.rot_order[2]]),
-                        )
-                    )
-                    tmp_tracks[tmp_node_path].append({"frame":(frame * frame_time), "rot": degrees(rot[dbone.rot_order[1]])})
+                    if (not (tmp_node_path_rot in tmp_tracks)):
+                            tmp_tracks[tmp_node_path_rot] = []
+
+                    if not dbone.skip_position:
+                        if (not (tmp_node_path_loc in tmp_tracks)):
+                                tmp_tracks[tmp_node_path_loc] = []
+                        tmp_loc = loc * global_scale * pixels_per_unit
+                        tmp_tracks[tmp_node_path_loc].append({"frame":(frame * frame_time), "values": [tmp_loc[0], -tmp_loc[1]]})
+                        # print("%.6f %.6f %.6f " % (loc * global_scale)[:])
+                        pass
+
+                    # print("{:%s} {:%d}, {:%.6f}"%(tmp_node_path,frame,degrees(rot[dbone.rot_order[2]])))
+                    # tmp_tracks[tmp_node_path_rot].append({"frame":(frame * frame_time), "values": degrees(rot[dbone.rot_order[2]])})
+                    tmp_tracks[tmp_node_path_rot].append({"frame":(frame * frame_time), "values": (-rot[dbone.rot_order[2]])})
 
                     dbone.prev_euler = rot
 
-                print("\n")
+                # print("\n")
 
             tmp_animations[obj.name] = tmp_tracks
+            # print(tmp_tracks)
 
     scene.frame_set(frame_current)
 

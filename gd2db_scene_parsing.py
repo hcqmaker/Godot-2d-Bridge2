@@ -31,7 +31,10 @@ class GodotSceneParser:
         self.elements = {
             "ext_resource": {},
             "sub_resource": [],
+            "sub_anims":[],
+            "sub_anim_lib":{},
             "node": {},
+            "node_player":{},
             "connection": []
         }
         self.godot_version = int(bpy.context.scene.godot_2d_bridge_tools.godot_version)
@@ -106,13 +109,13 @@ class GodotSceneParser:
 
     
     def append_animations(self, anims):
-        self.elements["anims"] = anims
+        self.elements["sub_anims"] += anims
         pass
     def append_animation_lib(self, data):
-        self.elements["anim_lib"] = data
+        self.elements["sub_anim_lib"] = data
         pass
     def append_animation_player(self, data):
-        self.elements["anim_player"] = data
+        self.elements["node_player"] = data
         pass
     # adds a dictionary entry to elements["ext_resource"] of the supplied resource with the resource id as the key
     def append_external_resources(self, resource):
@@ -240,7 +243,7 @@ class ObjectToExport:
         cls.pixels = bpy.context.scene.godot_2d_bridge_tools.pixels_per_unit
         cls.existing_ids = list(parsing_instance.elements["ext_resource"].keys())
 
-        cls.export_animations = list(export_animations(cls.exportable_objects))
+        cls.export_animations = export_animations(cls.exportable_objects)
 
         if cls.gd_scene_format == 1:
             cls.vector_array_key = "Vector2Array"
@@ -696,15 +699,14 @@ class ArmatureObjectParser(ObjectToExport):
                     edit_bone.parent.head_local.y - edit_bone.parent.tail_local.y
                 )
 
-                parent_angle = atan2(slope[0], slope[1]) + radians(90)
+                # parent_angle = atan2(slope[0], slope[1]) + radians(90)
                 parent_position = Vector((edit_bone.parent.head_local.x, edit_bone.parent.head_local.y))
             else:
-                parent_angle = 0.0
+                # parent_angle = 0.0
                 parent_position = Vector((0.0, 0.0))
             position -= parent_position
-            position = rotate_around_point(position, parent_angle)
+            # position = rotate_around_point(position, parent_angle)
             return position[0] * self.pixels, -position[1] * self.pixels
-
         # returns the location of the bone in the pose position, calculated for use in Godot's 2d space
         def pose_location():
             position = Vector((pose_bone.head.x, pose_bone.head.y))
@@ -713,13 +715,13 @@ class ArmatureObjectParser(ObjectToExport):
                     pose_bone.parent.head.x - pose_bone.parent.tail.x,
                     pose_bone.parent.head.y - pose_bone.parent.tail.y
                 )
-                parent_angle = atan2(slope[0], slope[1]) + radians(90)
+                # parent_angle = atan2(slope[0], slope[1]) + radians(90)
                 parent_position = Vector((pose_bone.parent.head.x, pose_bone.parent.head.y))
             else:
-                parent_angle = 0.0
+                # parent_angle = 0.0
                 parent_position = Vector((0.0, 0.0))
             position -= parent_position
-            position = rotate_around_point(position, parent_angle)
+            # position = rotate_around_point(position, parent_angle)
             return position[0] * self.pixels, -position[1] * self.pixels
 
         # returns the rotation of the bone in the rest position, calculated for use in Godot's 2d space
@@ -776,14 +778,13 @@ class ArmatureObjectParser(ObjectToExport):
         angle_at_rest = rest_angle()
 
         # parse a string that Godot will recognize as the bone's rest position
-        rest_pose = ", ".join(
-            [
-                str(x) for x in (
-                    cos(angle_at_rest), sin(angle_at_rest), -sin(angle_at_rest), cos(angle_at_rest), *location_at_rest
-                )
-            ]
-        )
-
+        #   1.0   0.0   ox
+        #   0.0   1.0   oy
+        rest_pose = ",".join([
+            str(x) for x in (1, 0, 0, 1,
+            location_at_rest[0], location_at_rest[1])
+        ])
+        
         # use the armatures pose position to determine whether to export the bone position in the rest mode or the pose
         # mode, ensures the user gets the results they expect as seen in Blender
         if self.obj.data.pose_position == 'POSE':
@@ -822,6 +823,22 @@ class AnimationsParser():
 
         pass
 
+    def amis_to_string(self, anim_dict, key_func):
+
+        key = key_func()
+        anim_name = 'animation'
+        anim_id = "Animation_" + key
+        self.anim_ids.append({"name":anim_name,"id":anim_id})
+
+        rs = []
+        rs.append(f"[sub_resource type=\"Animation\" id=\"{anim_id}\" ]")
+
+        ii = 0
+        for anim_obj_name in anim_dict: 
+            tmp_tracks = anim_dict[anim_obj_name]
+            ii = self._one_anim_to_str(tmp_tracks, rs, ii)
+        return rs
+    
     def anim_to_string(self, anim_name, anim_dict, key):
         # f"[sub_resource type=\"Animation\" id="Animation_kl7yp"]"
         anim_id = "Animation_" + key
@@ -831,21 +848,43 @@ class AnimationsParser():
             f"[sub_resource type=\"Animation\" id=\"{anim_id}\" ]"
         ]
 
-        ii = 0
-        for node_path in anim_dict:
-            frames = anim_dict[node_path]
+        self._one_anim_to_str(anim_dict, rs)
+        return rs
+
+    def _one_anim_to_str(self, tmp_tracks, rs, ii = 0):
+        for node_path in tmp_tracks:
+            frames = tmp_tracks[node_path]
+
+            is_location = False
+            if ":position" in node_path:
+                is_location = True
 
             frame_times = []
-            frame_rots = []
+            frame_values = []
             trans = []
-
+            # print(" frames:", len(frames))
             for frame_obj in frames:
                 frame = frame_obj["frame"]
-                rot = frame_obj["rot"]
+                vals = frame_obj["values"]
+                
+                frame_times.append("{:.3f}".format(frame))
+                if is_location:
+                    frame_values.append(f"Vector2({vals[0]}, {vals[1]})")
+                else:
+                    frame_values.append(str(vals))
+                trans.append('1')
 
-                frame_times.append(frame)
-                frame_rots.append(rot)
-                trans.append(1)
+
+            str_frame_times = '0'
+            str_trans = '1'
+            str_frame_values = '0.0'
+            if is_location:
+                str_frame_values = "Vector2(0.0, 0.0)"
+
+            if len(frame_times) > 0:
+                str_frame_times = ",".join(frame_times)
+                str_trans = ",".join(trans)
+                str_frame_values = ",".join(frame_values)
 
             rs.append(f"tracks/{ii}/type = \"value\"")
             rs.append(f"tracks/{ii}/imported = false")
@@ -854,77 +893,51 @@ class AnimationsParser():
             rs.append(f"tracks/{ii}/interp = 1")
             rs.append(f"tracks/{ii}/loop_wrap = true")
             rs.append("tracks/"+str(ii)+"/keys = {")
-            rs.append(f"\"times\": PackedFloat32Array({",".join(frame_times)}),")
-            rs.append(f"\"transitions\": PackedFloat32Array({",".join(trans)}),")
+            rs.append(f"\"times\": PackedFloat32Array({str_frame_times}),")
+            rs.append(f"\"transitions\": PackedFloat32Array({str_trans}),")
             rs.append(f"\"update\": 0,")
-            rs.append(f"\"values\": [{",".join(frame_rots)}]")
+            rs.append(f"\"values\": [{str_frame_values}]")
             rs.append("}")
 
             ii += 1
+        rs.append("")
 
-        return rs
-
+        return ii
+    
     def to_library(self, key):
         self.anim_lib_id = f"AnimationLibrary_{key}"
-        rs = [
-            f"[sub_resource type=\"AnimationLibrary\" id=\"{self.anim_lib_id}\"]"
-                " _data = {"
-            ]
+        rs = []
+        rs.append(f"[sub_resource type=\"AnimationLibrary\" id=\"{self.anim_lib_id}\"]")
+        rs.append("_data = {")
 
         num = len(self.anim_ids)
-        for i,anim_obj in self.anim_ids:
+        for i,anim_obj in enumerate(self.anim_ids):
 
             anim_name = anim_obj["name"]
             anim_id = anim_obj["id"]
 
-            tmp = f" &\"{anim_name}\": SubResource(\"{anim_id}\")"
+            tmp = f"&\"{anim_name}\": SubResource(\"{anim_id}\")"
             if (i != (num - 1)):
                 tmp += ","
             rs.append(tmp)
         
-        rs.append(" }")
+        rs.append("}")
+        rs.append("")
         return rs
 
     def to_player(self):
-       rs = [
-           " [node name=\"AnimationPlayer\" type=\"AnimationPlayer\" parent=\".\" ]"
-           " callback_mode_process = 0"
-           " libraries/ = SubResource(\"{self.anim_lib_id}\")"
-        ]
-       return rs
+        rs = []
+        rs.append("[node name=\"AnimationPlayer\" type=\"AnimationPlayer\" parent=\".\" ]")
+        rs.append("callback_mode_process = 0")
+        rs.append(f"libraries/ = SubResource(\"{self.anim_lib_id}\")")
+        rs.append("")
+        return rs
 
-
-# tracks/4/type = "value"
-# tracks/4/imported = false
-# tracks/4/enabled = true
-# tracks/4/path = NodePath("Skeleton2D/Root/Middle:rotation")
-# tracks/4/interp = 1
-# tracks/4/loop_wrap = true
-# tracks/4/keys = {
-# "times": PackedFloat32Array(0, 0.041666668, 0.083333336, 0.125, 0.16666667, 0.20833333, 0.25, 0.29166666, 0.33333334, 0.375, 0.41666666, 0.45833334, 0.5, 0.5416667, 0.5833333, 0.625, 0.6666667, 0.7083333, 0.75, 0.7916667, 0.8333333, 0.875, 0.9166667, 0.9583333, 1),
-# "transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
-# "update": 0,
-# "values": [0.0, 0.0, 0.00157079632679489, 0.00558505360638185, 0.011693705988362, 0.01919862177193762, 0.02757620218151041, 0.03630284844148206, 0.04468042885105484, 0.05218534463463045, 0.0582939970166106, 0.06248278722139699, 0.06387905062299247, 0.06265732014659643, 0.05916666164260777, 0.05393067388662478, 0.04729842272904633, 0.03996803987067014, 0.03193952531149623, 0.02408554367752174, 0.01658062789394613, 0.00994837673636767, 0.00471238898038469, 0.00122173047639603, 0.0]
-# }
-
-#         [sub_resource type="AnimationLibrary" id="AnimationLibrary_iefm8"]
-# _data = {
-# &"Idle": SubResource("Animation_kl7yp"),
-# &"RESET": SubResource("Animation_xkydt"),
-# &"Run": SubResource("Animation_fn7wb")
-# }
-
-# [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1497862076]
-# callback_mode_process = 0
-# libraries/ = SubResource("AnimationLibrary_iefm8")
-
-        
+  
 
 
 # uses data gathered by the previous classes to write a new *.tscn file
 def write_godot_scene(new_file_path):
-
-    
 
     # instantiate GodotSceneParser and get the initial elements of the scene to be built
     parsing_instance = GodotSceneParser()
@@ -1063,17 +1076,27 @@ def write_godot_scene(new_file_path):
     return True
 
 
+def _inline_get_key():
+    dt = int(time.time() * 1000)
+    return hashlib.md5(str(dt).encode(encoding='UTF-8')).hexdigest()[:5]
 
 def write_godot_scene_47(root_path, new_file_path):
 
     tmp_root_path = root_path.replace("\\","/")  + "/"
+    tmp_root_path = tmp_root_path.replace("//", "/")
     tmp_new_file_path = new_file_path.replace("\\","/")
     tmp_dir_path = os.path.dirname(tmp_new_file_path)
+    tmp_all_in_one = bpy.context.scene.godot_2d_bridge_tools.all_in_one
 
     tmp_texture_root = ''
-    if (tmp_dir_path.container(tmp_root_path)):
-        tmp_texture_root = tmp_dir_path.replace(tmp_root_path, '')
-    bpy.context.scene.godot_2d_bridge_tools.godot_version = 9
+    if (tmp_root_path in tmp_dir_path):
+        tmp_texture_root = tmp_dir_path.replace(tmp_root_path, '') + "/"
+
+    print("===> out path:",tmp_dir_path)
+    print("    root path:", tmp_root_path)
+    print("    file path:", tmp_new_file_path)
+    print("   texture root:", tmp_texture_root)
+    bpy.context.scene.godot_2d_bridge_tools.godot_version = "9"
 
 
     # instantiate GodotSceneParser and get the initial elements of the scene to be built
@@ -1181,23 +1204,23 @@ def write_godot_scene_47(root_path, new_file_path):
                 parsing_instance.append_nodes(object_parser.bone2d_node(bone))
             reporting_instance.end_sub_job()
 
-    # export Animations
+    # export Animations 
+    tmp_anim_object_parser = None
     tmp_anim_dict = ObjectToExport.export_animations
     if (len(tmp_anim_dict) > 0):
+        tmp_anim_object_parser = AnimationsParser()
+        # one by one
+        if not tmp_all_in_one:
+            for anim_obj_name in tmp_anim_dict: 
+                tmp_anims = tmp_anim_dict[anim_obj_name]
+                parsing_instance.append_animations(tmp_anim_object_parser.anim_to_string(anim_obj_name, tmp_anims, _inline_get_key()))
 
-        def _get_key():
-            dt = int(time.time() * 1000)
-            return hashlib.md5(str(dt).encode(encoding='UTF-8')).hexdigest()[:5]
+        # all in one
+        else:
+            parsing_instance.append_animations(tmp_anim_object_parser.amis_to_string(tmp_anim_dict, _inline_get_key))
 
-
-        object_parser = AnimationsParser()
-        for anim_obj_name in tmp_anim_dict: 
-            tmp_anims = tmp_anim_dict[anim_obj_name]
-            parsing_instance.append_animations(object_parser.anim_to_string(anim_obj_name, tmp_anims, _get_key()))
-
-        parsing_instance.append_animation_lib(object_parser.to_library( _get_key()))
-        parsing_instance.append_animation_player(object_parser.to_player())
-        
+        parsing_instance.append_animation_lib(tmp_anim_object_parser.to_library( _inline_get_key()))
+        parsing_instance.append_animation_player(tmp_anim_object_parser.to_player())
 
     # parse the name of the new file, build the list of job titles, and calculate there totals
     new_file = new_file_path.split(os.sep)[-1]

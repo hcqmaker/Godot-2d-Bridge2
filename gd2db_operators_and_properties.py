@@ -1,9 +1,13 @@
+from typing import Literal
+
 import bpy
 import json,os
 from mathutils import Vector, Matrix, Quaternion
 from time import perf_counter
 
 from bpy.types import (
+    Context,
+    Event,
     Operator,
     PropertyGroup
 )
@@ -31,7 +35,7 @@ from .gd2db_utilities import (
 )
 
 from .gd2db_2d_constraints import remove_all_constraints
-from .gd2db_scene_parsing import write_godot_scene
+from .gd2db_scene_parsing import write_godot_scene,write_godot_scene_47
 from .gd2db_utilities import export_objects, custom_message_box
 
 
@@ -108,10 +112,15 @@ class Godot2dBridgeProperties(PropertyGroup):
         description="Chose the version of Godot to export the scene for",
         default="7"
     )
+
     export_root: StringProperty(
         name="",
         default="",
         description="export godot scene root use for operator path for texture"
+    )
+    all_in_one:BoolProperty(
+        name="all animation in one",
+        description="Export animation all in in one"
     )
 
 # returns a "2d" coordinate constrained to the min and max coordinates
@@ -597,17 +606,22 @@ class GODOT_2D_BRIDGE_OT_import_sprites(Operator, ImportHelper):
 
         return {'FINISHED'}
 
-class GODOT_2D_BRIDGE_OT_export_root(Operator, ImportHelper):
-    bl_label = "Godot Export Root"
+class GODOT_2D_BRIDGE_OT_export_root(Operator, ExportHelper):
+    bl_label = "Godot res:// Path"
     bl_idname = "gd2db.export_root"
     bl_options = {'REGISTER', "UNDO"}
-    bl_description = "Chose path "
+    bl_description = "Chose path res://"
 
+    filename_ext = ""
     filter_glob: StringProperty(default="", options={'HIDDEN'})
+    filepath = StringProperty(name="File Path",default="",description="")
+
+    def invoke(self, context: Context, event: Event):
+        return super().invoke(context, event)
 
     def execute(self, context):
         # noinspection PyUnresolvedReferences
-        context.scene.godot_2d_bridge_tools.export_root = self.filepath
+        context.scene.godot_2d_bridge_tools.export_root = os.path.dirname(self.filepath)
         return {'FINISHED'}
 
 class GODOT_2D_BRIDGE_OT_export_47(Operator, ExportHelper):
@@ -631,6 +645,10 @@ class GODOT_2D_BRIDGE_OT_export_47(Operator, ExportHelper):
         if export_success:
             # parse the list of exported objects
             exported_list = [f"\"{x.name}\"" for x in export_objects()]
+            if len(exported_list) == 0:
+                custom_message_box(message="Select ObjectS and ArmatureS to Export.",title="Warning!",icon='INFO')
+                return
+            
             if len(exported_list) > 2:
                 exported_list = ", ".join(exported_list[0:-1]), exported_list[-1]
                 exported_list = f"{exported_list[0]}, and {exported_list[1]}"
