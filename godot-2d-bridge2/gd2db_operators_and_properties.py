@@ -551,7 +551,7 @@ class GODOT_2D_BRIDGE_OT_import_sprites(Operator, ImportHelper):
             for i, sprite in enumerate(sprite_data["nodes"]):
                 tmp_sprite_name = sprite["name"]
                 tmp_img_filepath = os.path.join(folder, sprite["resource_path"])
-                # print(tmp_img_filepath)
+                
                 pos = [sprite["position"][0], sprite["position"][1], sprite["z"]]
                 offset = [sprite["offset"][0], sprite["offset"][1], 0]
 
@@ -581,20 +581,15 @@ class GODOT_2D_BRIDGE_OT_import_sprites(Operator, ImportHelper):
                             target_phys_widthheight = img_h * tmp_scale
                             final_display_size = (target_phys_widthheight / 2) / scene_scale
 
-                        # TODO 位置错
-                        # tmp_scale 是不对的
                         pos_offset = (
                             Vector((pos[0], -pos[1], pos[2])) * tmp_scale * 0.5 +
                             Vector((offset[0], offset[1], offset[2])) * tmp_scale * 0.5
                         )
 
-                        
                         img_obj.empty_display_size = final_display_size
                         img_obj.empty_image_offset = [0, -1]
-                        # img_obj.location = pos_offset + Vector((img_w * 0.5, -img_h * 0.5, 0)) * tmp_scale
+                        img_obj.use_empty_image_alpha = True
                         img_obj.location = pos_offset
-
-                        # print(tmp_sprite_name, sprite["z"], pos_offset)
 
                 else:
                     print("not found:", tmp_img_filepath)
