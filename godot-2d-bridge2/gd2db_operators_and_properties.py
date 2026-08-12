@@ -554,11 +554,6 @@ class GODOT_2D_BRIDGE_OT_import_sprites(Operator, ImportHelper):
                 # print(tmp_img_filepath)
                 pos = [sprite["position"][0], sprite["position"][1], sprite["z"]]
                 offset = [sprite["offset"][0], sprite["offset"][1], 0]
-                
-                pos_offset = (
-                    Vector((pos[0], -pos[1], pos[2])) * tmp_scale
-                    + Vector((offset[0], offset[1], offset[2])) * tmp_scale
-                )
 
                 if os.path.exists(tmp_img_filepath):
                     
@@ -578,26 +573,33 @@ class GODOT_2D_BRIDGE_OT_import_sprites(Operator, ImportHelper):
                             _inline_link_object(img_obj)
                             img_obj.parent = sprite_object
 
-                        in_img = img_obj.data
-                        sz = in_img.size
-                        img_w = sz[0]
-                        img_h = sz[1]
+                        img_w, img_h = img_obj.data.size
 
-                        tmp_scale_y = img_h / img_w
-                        target_phys_width = img_w * tmp_scale
-                        final_display_size = (target_phys_width / 2) / scene_scale
+                        target_phys_widthheight = img_w * tmp_scale
+                        final_display_size = (target_phys_widthheight / 2) / scene_scale
+                        if img_h > img_w:
+                            target_phys_widthheight = img_h * tmp_scale
+                            final_display_size = (target_phys_widthheight / 2) / scene_scale
+
+                        # TODO 位置错
+                        # tmp_scale 是不对的
+                        pos_offset = (
+                            Vector((pos[0], -pos[1], pos[2])) * tmp_scale * 0.5 +
+                            Vector((offset[0], offset[1], offset[2])) * tmp_scale * 0.5
+                        )
+
                         
-                        img_obj.scale = (1.0, tmp_scale_y, 1.0)
-                        bpy.ops.object.transform_apply(location=False, scale=True, properties=False)
-                        img_obj.empty_display_size = final_display_size + 5
-
+                        img_obj.empty_display_size = final_display_size
                         img_obj.empty_image_offset = [0, -1]
+                        # img_obj.location = pos_offset + Vector((img_w * 0.5, -img_h * 0.5, 0)) * tmp_scale
                         img_obj.location = pos_offset
 
-                        print(tmp_sprite_name, sprite["z"], pos_offset)
+                        # print(tmp_sprite_name, sprite["z"], pos_offset)
 
                 else:
                     print("not found:", tmp_img_filepath)
+
+            # bpy.ops.object.transform_apply(location=False, scale=True, properties=False)
         context.scene.view_layers[0].objects.active = sprite_object
 
         bpy.ops.view3d.view_axis(type="TOP", align_active=False, relative=False)
