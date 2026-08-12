@@ -332,7 +332,7 @@ class GODOT_2D_BRIDGE_OT_2d_object_toggle(Operator):
                 # object, set the rotation mode to xyz euler, 0 the z location, and set the z scale to 1
                 obj['gd2db_object_2d'] = True
                 obj.rotation_mode = 'XYZ'
-                obj.location.z = 0
+                # obj.location.z = 0
                 obj.scale.z = 1
 
                 # lock the x and y rotation, and the z location and scale properties of the object
