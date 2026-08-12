@@ -29,13 +29,15 @@ from .gd2db_operators_and_properties import (
     GODOT_2D_BRIDGE_OT_export_47,
     GODOT_2D_BRIDGE_OT_clear,
     GODOT_2D_BRIDGE_OT_2d_object_toggle,
+    GODOT_2D_BRIDGE_OT_add_plane,
     GODOT_2D_BRIDGE_OT_apply_material,
     Godot2dBridgeProperties
 )
 
 from .gd2db_ui import (
     GODOT_2D_BRIDGE_PT_export_panel,
-    GODOT_2D_BRIDGE_PT_setup_panel
+    GODOT_2D_BRIDGE_PT_setup_panel,
+    GODOT_2D_BRIDGE_PT_export_panel_47
 )
 
 from .gd2db_2d_constraints import (
@@ -86,8 +88,10 @@ classes = (
     GODOT_2D_BRIDGE_OT_export_47,
     GODOT_2D_BRIDGE_OT_clear,
     GODOT_2D_BRIDGE_OT_2d_object_toggle,
+    GODOT_2D_BRIDGE_OT_add_plane,
     GODOT_2D_BRIDGE_PT_setup_panel,
     GODOT_2D_BRIDGE_PT_export_panel,
+    GODOT_2D_BRIDGE_PT_export_panel_47,
     Godot2dBridgeProperties
 )
 

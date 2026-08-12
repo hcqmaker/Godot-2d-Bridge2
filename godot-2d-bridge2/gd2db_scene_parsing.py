@@ -32,9 +32,9 @@ class GodotSceneParser:
             "ext_resource": {},
             "sub_resource": [],
             "sub_anims":[],
-            "sub_anim_lib":{},
+            "sub_anim_lib":[],
             "node": {},
-            "node_player":{},
+            "node_player":[],
             "connection": []
         }
         self.godot_version = int(bpy.context.scene.godot_2d_bridge_tools.godot_version)
@@ -112,20 +112,21 @@ class GodotSceneParser:
         self.elements["sub_anims"] += anims
         pass
     def append_animation_lib(self, data):
-        self.elements["sub_anim_lib"] = data
+        self.elements["sub_anim_lib"] += data
         pass
     def append_animation_player(self, data):
-        self.elements["node_player"] = data
+        self.elements["node_player"] += data
         pass
     # adds a dictionary entry to elements["ext_resource"] of the supplied resource with the resource id as the key
     def append_external_resources(self, resource):
         # use re pattern matching to find the resource's id
-        pattern = re.compile(r"id=(\d+?)")
+        pattern = re.compile(r"id=(\d+)")
         match = re.search(pattern, resource)
-        resource_id = int(match.group(1))
+        resource_id = str(match.group(1))
 
         # add the dictionary entry, using resource_id as the key ensures there is only one entry per id
         self.elements["ext_resource"][resource_id] = resource
+        # print(" resource_id=", resource_id, "==", resource)
 
     # sets up self.elements based on if the user supplied path to an existing Godot scene
     def initialize_scene_elements(self):
@@ -161,7 +162,6 @@ class GodotSceneParser:
         self.elements["ext_resource"] = [
             update_and_return(x[1]) for x in sorted(self.elements["ext_resource"].items())
         ]
-
         self._end_reporting_instance()
 
     # creates a sorted list of nodes and assigns the list to self.elements["node"]
@@ -399,6 +399,7 @@ class MeshObjectParser(ObjectToExport):
 
     def __init__(self, obj):
         super().__init__(obj)
+        self.mesh_obj = obj
         self.mesh = obj.data
         self.reporting_instance = None
         self.resource_path = ""
@@ -470,7 +471,7 @@ class MeshObjectParser(ObjectToExport):
 
     # returns the external resource string based on the values in self.resource_path and self.resource_id
     def external_resource(self):
-        return f"[ext_resource path=\"{self.resource_path}\" type=\"Texture\" id={self.resource_id}]\n"
+        return f"[ext_resource type=\"Texture\" path=\"{self.resource_path}\"  id={self.resource_id}]"
 
     # returns a map of the indexes of vertices in blender to the index of those vertices expected in Godot
     def _vertex_map_and_internal_vertex_count(self):
@@ -628,9 +629,14 @@ class MeshObjectParser(ObjectToExport):
 
     # returns the Polygon2D node string
     def polygon2d_node(self):
+
+        pixels_per_unit = bpy.context.scene.godot_2d_bridge_tools.pixels_per_unit
+
+
         vertex_index_map, internal_vertex_count = self._vertex_map_and_internal_vertex_count()
         vertex_coordinates, bone_weights, uv_coordinates = self._vertex_relative_data(vertex_index_map)
         location, rotation, scale = self._relative_object_transforms()
+        z_index = -int(self.mesh_obj.location[2] * pixels_per_unit)
 
         # remove references to internal vertices for Godot 3.0 and earlier
         if self.godot_version < 3:
@@ -658,6 +664,7 @@ class MeshObjectParser(ObjectToExport):
 
         return (
             f"[node name=\"{self.obj.name}\" type=\"Polygon2D\" parent=\"{self.parent_string}\"]\n"
+            f"z_index = {z_index} \n"
             f"{texture_line}"
             f"{self.position_key} = Vector2( {location} )\n"
             f"{self.rotation_key} = {rotation}\n"
@@ -1204,6 +1211,9 @@ def write_godot_scene_47(root_path, new_file_path):
                 parsing_instance.append_nodes(object_parser.bone2d_node(bone))
             reporting_instance.end_sub_job()
 
+    # for item in parsing_instance.elements["ext_resource"].items():
+    #     print(item)
+
     # export Animations 
     tmp_anim_object_parser = None
     tmp_anim_dict = ObjectToExport.export_animations
@@ -1245,6 +1255,7 @@ def write_godot_scene_47(root_path, new_file_path):
 
     # create the *.tscn file and write the elements from the parsing_instance to the file
     reporting_instance.start_sub_job()
+
     elements = [parsing_instance.parse_file_descriptor()] + sum(parsing_instance.elements.values(), [])
     with open(new_file_path, "w") as new_godot_scene:
         for element in elements:

@@ -80,13 +80,26 @@ class GODOT_2D_BRIDGE_PT_export_panel(Panel):
         if not list(export_objects()) or context.mode != 'OBJECT':
             row.enabled = False
         row.operator("gd2db.export")
+        
+class GODOT_2D_BRIDGE_PT_export_panel_47(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "Godot 2d Bridge"
+    bl_label = "Exporter"
 
-
+    def draw(self, context):
         box = self.layout.box()
         row = box.row(align=True)
         row.operator("gd2db.set_2d_view")
         row = box.row(align=True)
         row.operator("gd2db.import_sprites")
+        row = box.row(align=True)
+        row.operator("gd2db.sprite_add_plane")
+        if not any(
+                x.empty_display_type == 'IMAGE'
+                for x in context.selected_objects
+        ) or context.mode != 'OBJECT':
+            row.enabled = False
         row = box.row(align=True)
         row.label(text="Godot res:// Path:")
         row = box.row(align=True)
@@ -96,4 +109,3 @@ class GODOT_2D_BRIDGE_PT_export_panel(Panel):
         row.prop(context.scene.godot_2d_bridge_tools, "all_in_one")
         row = box.row(align=True)
         row.operator("gd2db.export_47")
-        

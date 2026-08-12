@@ -509,6 +509,31 @@ def _inline_link_object(obj):
     active_collection.objects.link(obj)
     return obj
 
+class GODOT_2D_BRIDGE_OT_add_plane(Operator):
+    bl_label = "According Sprite Add Plane"
+    bl_idname = "gd2db.sprite_add_plane"
+    bl_options = {'REGISTER', "UNDO"}
+    bl_description = "according sprite add plane"
+
+    def execute(self, context: Context):
+        active_object = context.view_layer.objects.active
+
+        objects_to_apply = (
+                    x for x in context.selected_objects
+                    if x.empty_display_type == 'IMAGE'
+                )
+        
+        # create need panel
+        for obj in objects_to_apply:
+            if not obj.gd2db_object_2d:
+                pos = obj.location
+                tmp_plane_name = "ms_" + obj.name
+                bpy.ops.mesh.primitive_plane_add(location=(0,0, pos[2]))
+                tmp_plane = bpy.context.object
+                tmp_plane.name = tmp_plane_name
+        context.view_layer.objects.active = active_object
+        return {'FINISHED'}
+    
 class GODOT_2D_BRIDGE_OT_import_sprites(Operator, ImportHelper):
     bl_label = "Import Sprites"
     bl_idname = "gd2db.import_sprites"
@@ -591,6 +616,13 @@ class GODOT_2D_BRIDGE_OT_import_sprites(Operator, ImportHelper):
                         img_obj.use_empty_image_alpha = True
                         img_obj.location = pos_offset
 
+                        # create need panel
+                        # tmp_plane_name = "ms_" + tmp_sprite_name
+                        # bpy.ops.mesh.primitive_plane_add(location=(0,0,pos_offset[2]))
+                        # tmp_plane = bpy.context.object
+                        # tmp_plane.name = tmp_plane_name
+
+                        # bpy.context.collection.objects.link(Myobject)
                 else:
                     print("not found:", tmp_img_filepath)
 
