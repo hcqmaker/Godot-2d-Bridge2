@@ -266,8 +266,6 @@ class DecoratedBone:
         else:
             return "[\"%s\" root bone]\n" % (self.name)
 
-
-
 def export_animations(objs):
     ### this animation export code see addons_core/io_anim_bvh/export_bvh.py
     scene = bpy.context.scene

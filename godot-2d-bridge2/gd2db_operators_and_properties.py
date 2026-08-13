@@ -1,7 +1,7 @@
 from typing import Literal
 
 import bpy
-import json,os
+import json,os,math
 from mathutils import Vector, Matrix, Quaternion
 from time import perf_counter
 
@@ -397,9 +397,10 @@ class GODOT_2D_BRIDGE_OT_2d_object_toggle(Operator):
                 # and all locked properties can now be changed by the user
                 del obj["gd2db_object_2d"]
                 if obj.type == 'MESH':
-                    del obj["gd2db_texture_image"]
-                    del obj["gd2db_image_width"]
-                    del obj["gd2db_image_height"]
+                    if (hasattr(obj, "gd2db_texture_image")):
+                        del obj["gd2db_texture_image"]
+                        del obj["gd2db_image_width"]
+                        del obj["gd2db_image_height"]
 
         # reset the active object and remove all constraint handlers and timers
         context.view_layer.objects.active = active_object
@@ -534,6 +535,83 @@ class GODOT_2D_BRIDGE_OT_add_plane(Operator):
         context.view_layer.objects.active = active_object
         return {'FINISHED'}
     
+class GODOT_2D_BRIDGE_OT_add_armature(Operator):
+    bl_label = "According Sprite Add Armature"
+    bl_idname = "gd2db.sprite_add_armature"
+    bl_options = {'REGISTER', "UNDO"}
+    bl_description = "according sprite add Armature"
+
+    def execute(self, context: Context):
+        # active_object = context.view_layer.objects.active
+        objects_to_apply = (
+                    x for x in context.selected_objects
+                    if x.type == 'MESH' and  "ms_" in x.name 
+                )
+
+        for obj in context.selected_objects:
+            obj.select_set(False)
+        
+        # create need armature
+        for obj in objects_to_apply:
+            if obj.gd2db_object_2d:
+                # pos = obj.location
+                tmp_name = obj.name.replace("ms_", "ar_")
+                loc = obj.location
+                if context.active_object != None:
+                    bpy.ops.object.mode_set(mode="OBJECT")
+
+                bpy.ops.object.armature_add(
+                    radius=1,
+                    enter_editmode=True,
+                    align="WORLD",
+                    location=(loc[0], loc[1], 0),
+                    rotation=(0, 0, 0),
+                    # rotation=(math.radians(-90), 0, 0),
+                )
+                
+                active_object = bpy.context.active_object
+                active_object.name = tmp_name
+
+                armature_object = active_object.data
+                armature_object.show_names = True
+                # armature_object.dsiplay_fron
+                bone_obj = armature_object.edit_bones.active
+                bone_obj.tail = (0, 1, 0)
+                
+        
+        # bpy.ops.object.transform_apply(location=False, rotation=True, scale=False, properties=False)
+        bpy.ops.object.mode_set(mode='OBJECT')
+        # context.view_layer.objects.active = active_object
+        return {'FINISHED'}
+
+class   GODOT_2D_BRIDGE_OT_add_bone(Operator):
+    bl_label = "Armature Edit Add Bone"
+    bl_idname = "gd2db.edit_add_bone"
+    bl_options = {'REGISTER', "UNDO"}
+    bl_description = "add bone"
+
+    bone_name:StringProperty(default='')
+
+    def invoke(self, context: Context, event: Event):
+        return ""
+
+    def execute(self, context):
+        # bpy.ops.armature.bone_primitive_add(align='3D_VIEW')
+        # bpy.ops.armature.bone_primitive_add()
+
+        edit_bones = context.active_object.data.edit_bones
+        loc = context.scene.cursor.location - context.active_object.matrix_world.translation
+
+        tmp_bone_name = 'Bone'
+        if self.bone_name != '':
+            tmp_bone_name = self.bone_name
+
+        bone = edit_bones.new(tmp_bone_name)
+        bone.head = Vector(loc)
+        bone.tail = Vector((loc[0], loc[1] + 1, 0))
+
+        return {'FINISHED'}
+
 class GODOT_2D_BRIDGE_OT_import_sprites(Operator, ImportHelper):
     bl_label = "Import Sprites"
     bl_idname = "gd2db.import_sprites"
@@ -616,17 +694,10 @@ class GODOT_2D_BRIDGE_OT_import_sprites(Operator, ImportHelper):
                         img_obj.use_empty_image_alpha = True
                         img_obj.location = pos_offset
 
-                        # create need panel
-                        # tmp_plane_name = "ms_" + tmp_sprite_name
-                        # bpy.ops.mesh.primitive_plane_add(location=(0,0,pos_offset[2]))
-                        # tmp_plane = bpy.context.object
-                        # tmp_plane.name = tmp_plane_name
-
-                        # bpy.context.collection.objects.link(Myobject)
                 else:
                     print("not found:", tmp_img_filepath)
 
-            # bpy.ops.object.transform_apply(location=False, scale=True, properties=False)
+            # bpy.ops.object.transform_apply(location=False, scale=False, properties=False)
         context.scene.view_layers[0].objects.active = sprite_object
 
         bpy.ops.view3d.view_axis(type="TOP", align_active=False, relative=False)
