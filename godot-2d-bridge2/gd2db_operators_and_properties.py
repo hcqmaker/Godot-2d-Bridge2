@@ -612,9 +612,16 @@ class   GODOT_2D_BRIDGE_OT_add_bone(Operator):
             tmp_bone_name = self.bone_name
 
         active_edit_bone = edit_bones.active
+
         edit_bone:bpy.types.EditBone = edit_bones.new(tmp_bone_name)
         edit_bone.head = Vector(loc)
         edit_bone.tail = Vector((loc[0], loc[1] + 1, 0))
+
+        # edit_bone["lock_z"] = True
+        # edit_bone["lock_rot"] = True
+
+        tmp_bone_name = edit_bone.name
+
         if (edit_bones.active != None):
             edit_bone.parent = active_edit_bone
 
@@ -622,15 +629,15 @@ class   GODOT_2D_BRIDGE_OT_add_bone(Operator):
             active_edit_bone.select_tail = False
             active_edit_bone.select = False
 
-        if tmp_bone_name in active_object.pose.bones:
-            # pose_bone = active_object.pose.bones[tmp_bone_name]
-            # pose_bone.lock_rotation[0] = True
-            # pose_bone.lock_rotation[1] = True
+        # print("-----tmp_bone_name-------",tmp_bone_name)
+        # if tmp_bone_name in active_object.pose.bones:
+        #     pose_bone = active_object.pose.bones[tmp_bone_name]
+        #     print("-----find-------")
+        # #     pose_bone.lock_rotation[0] = True
+        # #     pose_bone.lock_rotation[1] = True
 
-            # pose_bone.lock_scale[0] = True
-            # pose_bone.lock_scale[1] = True
-            # pose_bone.lock_scale[2] = True
-            pass
+        # #     pose_bone.lock_scale[2] = True
+        # #     pass
 
         _inline_selected_edit_bones(edit_bones, False)
 
@@ -640,6 +647,29 @@ class   GODOT_2D_BRIDGE_OT_add_bone(Operator):
 
         return {'FINISHED'}
 
+class   GODOT_2D_BRIDGE_OT_lock_pose_bones(Operator):
+    bl_label = "Lock Rot(x,y) Sc(z) Loc(z)"
+    bl_idname = "gd2db.lock_pose_bones"
+    bl_options = {'REGISTER', "UNDO"}
+    bl_description = "Set Bones Lock x,y Rotation/ Lock z Scale"
+
+    def execute(self, context: Context):
+
+        ob = context.active_object
+        armature = ob.data
+        
+        ### lock posebone scale z value
+        for bone in armature.bones:
+            if bone.name in ob.pose.bones:
+                pose_bone = ob.pose.bones[bone.name]
+                pose_bone.lock_scale[2] = True
+
+                pose_bone.lock_location[2] = True
+                pose_bone.lock_rotation[0] = True
+                pose_bone.lock_rotation[1] = True
+                   
+        return {'FINISHED'}
+    
 class GODOT_2D_BRIDGE_OT_import_sprites(Operator, ImportHelper):
     bl_label = "Import Sprites"
     bl_idname = "gd2db.import_sprites"

@@ -100,15 +100,22 @@ class GODOT_2D_BRIDGE_PT_export_panel_47(Panel):
                 for x in context.selected_objects
         ) or context.mode != 'OBJECT':
             row.enabled = False
+
         row = box.row(align=True)
         row.operator("gd2db.sprite_add_armature")
         if not (context.active_object) or not ("ms_" in context.active_object.name) or context.mode != 'OBJECT':
             row.enabled = False
+
         row = box.row(align=True)
         row.operator("gd2db.edit_add_bone")
-        # print(context.mode)
         if not (context.active_object) or not ("ar_" in context.active_object.name) or context.mode != 'EDIT_ARMATURE':
             row.enabled = False
+
+        row = box.row(align=True)
+        row.operator("gd2db.lock_pose_bones")
+        if not (context.active_object) or not ("ar_" in context.active_object.name) or context.mode != 'OBJECT':
+            row.enabled = False
+            
         row = box.row(align=True)
         row.label(text="Godot res:// Path:")
         row = box.row(align=True)

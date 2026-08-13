@@ -24,10 +24,13 @@ from .gd2db_operators_and_properties import (
     GODOT_2D_BRIDGE_OT_scene_selection,
     GODOT_2D_BRIDGE_OT_export,
     GODOT_2D_BRIDGE_OT_2d_view,
+
     GODOT_2D_BRIDGE_OT_import_sprites,
     GODOT_2D_BRIDGE_OT_add_plane,
     GODOT_2D_BRIDGE_OT_add_armature,
     GODOT_2D_BRIDGE_OT_add_bone,
+    GODOT_2D_BRIDGE_OT_lock_pose_bones,
+
     GODOT_2D_BRIDGE_OT_export_root,
     GODOT_2D_BRIDGE_OT_export_47,
     GODOT_2D_BRIDGE_OT_clear,
@@ -90,6 +93,7 @@ classes = (
     GODOT_2D_BRIDGE_OT_add_plane,
     GODOT_2D_BRIDGE_OT_add_armature,
     GODOT_2D_BRIDGE_OT_add_bone,
+    GODOT_2D_BRIDGE_OT_lock_pose_bones,
 
     GODOT_2D_BRIDGE_OT_export_root,
     GODOT_2D_BRIDGE_OT_export_47,
