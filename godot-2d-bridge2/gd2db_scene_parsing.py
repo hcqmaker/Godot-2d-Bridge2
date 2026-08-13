@@ -1093,7 +1093,7 @@ def write_godot_scene_47(root_path, new_file_path):
     tmp_root_path = tmp_root_path.replace("//", "/")
     tmp_new_file_path = new_file_path.replace("\\","/")
     tmp_dir_path = os.path.dirname(tmp_new_file_path)
-    tmp_all_in_one = bpy.context.scene.godot_2d_bridge_tools.all_in_one
+    tmp_all_in_one = True #bpy.context.scene.godot_2d_bridge_tools.all_in_one
 
     tmp_texture_root = ''
     if (tmp_root_path in tmp_dir_path):

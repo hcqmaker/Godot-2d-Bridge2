@@ -511,6 +511,12 @@ def _inline_link_object(obj):
     active_collection.objects.link(obj)
     return obj
 
+def _inline_selected_edit_bones(edit_bones, selected:bool):
+    for edit_bone in edit_bones:
+        edit_bone.select = selected
+        edit_bone.select_head = selected
+        edit_bone.select_tail = selected
+
 class GODOT_2D_BRIDGE_OT_add_plane(Operator):
     bl_label = "According Sprite Add Plane"
     bl_idname = "gd2db.sprite_add_plane"
@@ -593,23 +599,44 @@ class   GODOT_2D_BRIDGE_OT_add_bone(Operator):
 
     bone_name:StringProperty(default='')
 
-    def invoke(self, context: Context, event: Event):
-        return ""
-
     def execute(self, context):
         # bpy.ops.armature.bone_primitive_add(align='3D_VIEW')
         # bpy.ops.armature.bone_primitive_add()
-
-        edit_bones = context.active_object.data.edit_bones
-        loc = context.scene.cursor.location - context.active_object.matrix_world.translation
+        
+        active_object = context.active_object
+        edit_bones = active_object.data.edit_bones
+        loc = context.scene.cursor.location - active_object.matrix_world.translation
 
         tmp_bone_name = 'Bone'
         if self.bone_name != '':
             tmp_bone_name = self.bone_name
 
-        bone = edit_bones.new(tmp_bone_name)
-        bone.head = Vector(loc)
-        bone.tail = Vector((loc[0], loc[1] + 1, 0))
+        active_edit_bone = edit_bones.active
+        edit_bone:bpy.types.EditBone = edit_bones.new(tmp_bone_name)
+        edit_bone.head = Vector(loc)
+        edit_bone.tail = Vector((loc[0], loc[1] + 1, 0))
+        if (edit_bones.active != None):
+            edit_bone.parent = active_edit_bone
+
+            active_edit_bone.select_head = False
+            active_edit_bone.select_tail = False
+            active_edit_bone.select = False
+
+        if tmp_bone_name in active_object.pose.bones:
+            # pose_bone = active_object.pose.bones[tmp_bone_name]
+            # pose_bone.lock_rotation[0] = True
+            # pose_bone.lock_rotation[1] = True
+
+            # pose_bone.lock_scale[0] = True
+            # pose_bone.lock_scale[1] = True
+            # pose_bone.lock_scale[2] = True
+            pass
+
+        _inline_selected_edit_bones(edit_bones, False)
+
+        edit_bone.select = True
+        edit_bone.select_head = True
+        edit_bone.select_tail = True
 
         return {'FINISHED'}
 
