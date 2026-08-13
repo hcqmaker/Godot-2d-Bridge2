@@ -476,7 +476,8 @@ def _inline_set_view(mode):
 
 def _inline_set_middle_mouse_move(enable):
     km = bpy.context.window_manager.keyconfigs.addon.keymaps["3D View"]
-    km.keymap_items["view3d.move"].active = enable
+    if ('view3d.move' in km.keymap_items):
+        km.keymap_items["view3d.move"].active = enable
 
 
 class GODOT_2D_BRIDGE_OT_2d_view(Operator):

@@ -112,6 +112,11 @@ def register_keymaps():
     # keymaps = keymaps.append((km,kmi))
 
     # blender_python_reference_5_2/bpy.types.KeyMaps.html#bpy.types.KeyMaps
+    kc = bpy.context.window_manager.keyconfigs.addon
+    if kc:
+        km = kc.keymaps.new(name="3D View", space_type="VIEW_3D")
+        kmi = km.keymap_items.new("view3d.move", "MIDDLEMOUSE", "PRESS")
+        kmi.active = False
 
     addon = bpy.context.window_manager.keyconfigs.addon
     if addon is None:
