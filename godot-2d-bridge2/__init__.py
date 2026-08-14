@@ -1,8 +1,8 @@
 bl_info = {
     "name": "Godot 2d Bridge",
     "author": "TorKai",
-    "version": (1, 0),
-    "blender": (2, 80, 0),
+    "version": (1, 1),
+    "blender": (5, 1, 2),
     "location": "View3D > Sidebar > Godot 2d Bridge",
     "description": "Used to bridge Blender and Godot's 2d mesh, bone, and skinning functionality",
     "warning": "",
