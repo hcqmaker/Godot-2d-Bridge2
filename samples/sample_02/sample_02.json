@@ -1,0 +1,59 @@
+{
+    "name": "sample_02",
+    "nodes": [
+        {
+            "name": "top",
+            "type": "SPRITE",
+            "node_path": "top",
+            "resource_path": "sprites/top.png",
+            "pivot_offset": [0,0],
+            "offset": [-1240,1754],
+            "position": [642,1048],
+            "rotation": 0,
+            "scale": [1,1],
+            "opacity": 1,
+            "z": 0,
+            "tiles_x": 1,
+            "tiles_y": 1,
+            "frame_index": 0,
+            "children": [],
+            "blend_mode": "NORMAL"
+        },
+        {
+            "name": "middle",
+            "type": "SPRITE",
+            "node_path": "middle",
+            "resource_path": "sprites/middle.png",
+            "pivot_offset": [0,0],
+            "offset": [-1240,1754],
+            "position": [719,1563],
+            "rotation": 0,
+            "scale": [1,1],
+            "opacity": 1,
+            "z": -1,
+            "tiles_x": 1,
+            "tiles_y": 1,
+            "frame_index": 0,
+            "children": [],
+            "blend_mode": "NORMAL"
+        },
+        {
+            "name": "bottom",
+            "type": "SPRITE",
+            "node_path": "bottom",
+            "resource_path": "sprites/bottom.png",
+            "pivot_offset": [0,0],
+            "offset": [-1240,1754],
+            "position": [1085,2070],
+            "rotation": 0,
+            "scale": [1,1],
+            "opacity": 1,
+            "z": -2,
+            "tiles_x": 1,
+            "tiles_y": 1,
+            "frame_index": 0,
+            "children": [],
+            "blend_mode": "NORMAL"
+        }
+    ]
+}
