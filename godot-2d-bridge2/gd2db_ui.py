@@ -46,7 +46,7 @@ class GODOT_2D_BRIDGE_PT_setup_panel(Panel):
         # list all gd2db object
         box = self.layout.box()
         row = box.row(align=True)
-        row.operator("gd2db.list_export_objects")
+        row.operator("gd2db.list_export_objects", icon="FILE_REFRESH")
         box.template_list(
                 "GODOT_2D_BRIDGE_UL_ObjCollections", "dummy", 
                 tool_obj,
