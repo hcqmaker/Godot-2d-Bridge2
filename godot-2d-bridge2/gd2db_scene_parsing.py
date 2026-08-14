@@ -12,13 +12,14 @@ from math import (
     radians,
     sin,
     cos,
-    atan2
+    atan2,
+    ceil
 )
 
 from .gd2db_utilities import (
     rotate_around_point,
     export_objects,
-    export_animations,
+    export_animation_dict,
     custom_message_box
     )
 
@@ -243,7 +244,7 @@ class ObjectToExport:
         cls.pixels = bpy.context.scene.godot_2d_bridge_tools.pixels_per_unit
         cls.existing_ids = list(parsing_instance.elements["ext_resource"].keys())
 
-        cls.export_animations = export_animations(cls.exportable_objects)
+        cls.export_animation_dict = export_animation_dict(cls.exportable_objects)
 
         if cls.gd_scene_format == 1:
             cls.vector_array_key = "Vector2Array"
@@ -632,11 +633,11 @@ class MeshObjectParser(ObjectToExport):
 
         pixels_per_unit = bpy.context.scene.godot_2d_bridge_tools.pixels_per_unit
 
-
         vertex_index_map, internal_vertex_count = self._vertex_map_and_internal_vertex_count()
         vertex_coordinates, bone_weights, uv_coordinates = self._vertex_relative_data(vertex_index_map)
         location, rotation, scale = self._relative_object_transforms()
-        z_index = -int(self.mesh_obj.location[2] * pixels_per_unit)
+        z_index = -ceil(abs(self.mesh_obj.location[2]) * pixels_per_unit)
+        # print("--===>", pixels_per_unit, self.mesh_obj.location[2], self.mesh_obj.location[2] * pixels_per_unit, z_index)
 
         # remove references to internal vertices for Godot 3.0 and earlier
         if self.godot_version < 3:
@@ -837,12 +838,17 @@ class AnimationsParser():
         anim_id = "Animation_" + key
         self.anim_ids.append({"name":anim_name,"id":anim_id})
 
+        anim_frame_times = anim_dict['times']
+        anim_array = anim_dict['anims']
+
         rs = []
         rs.append(f"[sub_resource type=\"Animation\" id=\"{anim_id}\" ]")
+        rs.append(f"length = {anim_frame_times}")
 
         ii = 0
-        for anim_obj_name in anim_dict: 
-            tmp_tracks = anim_dict[anim_obj_name]
+        for anim_obj in anim_array: 
+            # anim_obj_name = anim_obj['name']
+            tmp_tracks = anim_obj['values']
             ii = self._one_anim_to_str(tmp_tracks, rs, ii)
         return rs
     
@@ -1093,7 +1099,7 @@ def write_godot_scene_47(root_path, new_file_path):
     tmp_root_path = tmp_root_path.replace("//", "/")
     tmp_new_file_path = new_file_path.replace("\\","/")
     tmp_dir_path = os.path.dirname(tmp_new_file_path)
-    tmp_all_in_one = True #bpy.context.scene.godot_2d_bridge_tools.all_in_one
+    # tmp_all_in_one = True #bpy.context.scene.godot_2d_bridge_tools.all_in_one
 
     tmp_texture_root = ''
     if (tmp_root_path in tmp_dir_path):
@@ -1216,18 +1222,20 @@ def write_godot_scene_47(root_path, new_file_path):
 
     # export Animations 
     tmp_anim_object_parser = None
-    tmp_anim_dict = ObjectToExport.export_animations
-    if (len(tmp_anim_dict) > 0):
+    tmp_anim_dict = ObjectToExport.export_animation_dict
+    print("animations num:", tmp_anim_dict['num'])
+    if (tmp_anim_dict['num'] > 0):
         tmp_anim_object_parser = AnimationsParser()
-        # one by one
-        if not tmp_all_in_one:
-            for anim_obj_name in tmp_anim_dict: 
-                tmp_anims = tmp_anim_dict[anim_obj_name]
-                parsing_instance.append_animations(tmp_anim_object_parser.anim_to_string(anim_obj_name, tmp_anims, _inline_get_key()))
+        # # one by one
+        # if not tmp_all_in_one:
+        #     for anim_obj in tmp_anim_array:
+        #         anim_obj_name = anim_obj['name']
+        #         tmp_anims = anim_obj['values']
+        #         parsing_instance.append_animations(tmp_anim_object_parser.anim_to_string(anim_obj_name, tmp_anims, _inline_get_key()))
 
-        # all in one
-        else:
-            parsing_instance.append_animations(tmp_anim_object_parser.amis_to_string(tmp_anim_dict, _inline_get_key))
+        # # all in one
+        # else:
+        parsing_instance.append_animations(tmp_anim_object_parser.amis_to_string(tmp_anim_dict, _inline_get_key))
 
         parsing_instance.append_animation_lib(tmp_anim_object_parser.to_library( _inline_get_key()))
         parsing_instance.append_animation_player(tmp_anim_object_parser.to_player())

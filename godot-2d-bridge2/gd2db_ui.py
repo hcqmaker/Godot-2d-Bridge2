@@ -1,5 +1,7 @@
+
+import bpy
 from bpy.types import Panel
-from .gd2db_utilities import export_objects
+from .gd2db_utilities import export_objects, list_export_objects
 
 
 # noinspection PyPep8Naming
@@ -11,6 +13,9 @@ class GODOT_2D_BRIDGE_PT_setup_panel(Panel):
 
     def draw(self, context):
         # noinspection PyUnresolvedReferences
+
+        tool_obj = context.scene.godot_2d_bridge_tools
+
         box = self.layout.box()
         row = box.row(align=True)
         row.label(text="Object Conversion")
@@ -29,7 +34,7 @@ class GODOT_2D_BRIDGE_PT_setup_panel(Panel):
         row = box.row(align=True)
         row.label(text="Image Texture")
         row = box.row(align=True)
-        row.prop(context.scene.godot_2d_bridge_tools, "reference_empty")
+        row.prop(tool_obj, "reference_empty")
         row = box.row(align=True)
         if not any(x.gd2db_object_2d for x in context.selected_objects)\
                 or not any(x.type == 'MESH' for x in context.selected_objects)\
@@ -37,6 +42,24 @@ class GODOT_2D_BRIDGE_PT_setup_panel(Panel):
                 or context.mode != 'OBJECT':
             row.enabled = False
         row.operator("gd2db.material")
+
+        # list all gd2db object
+        box = self.layout.box()
+        row = box.row(align=True)
+        row.operator("gd2db.list_export_objects")
+        box.template_list(
+                "GODOT_2D_BRIDGE_UL_ObjCollections", "dummy", 
+                tool_obj,
+                "export_objs",
+                tool_obj,
+                "export_idx",
+                rows=2,
+                maxrows=10,
+                type="DEFAULT",
+            )
+
+        # gd2db.list_export_objects
+        # bpy.ops.gd2db.list_export_objects()
 
 
 # noinspection PyPep8Naming

@@ -149,6 +149,7 @@ def is_exportable_object(obj):
     # only include armatures if Godot version is 3.1 or later
     if int(bpy.context.scene.godot_2d_bridge_tools.godot_version) > 2:
         object_types += ['ARMATURE']
+
     return (
         obj.gd2db_object_2d and obj.visible_get() and
         any(obj.type == x for x in object_types)
@@ -167,6 +168,15 @@ def export_objects():
             obj for obj in bpy.context.scene.objects if is_exportable_object(obj)
         )
     return exportable_objects
+
+def list_export_objects():
+    rs = export_objects()
+    tool_obj = bpy.context.scene.godot_2d_bridge_tools
+    tool_obj.export_objs.clear()
+    for obj in rs:
+        item = tool_obj.export_objs.add()
+        item.name = obj.name
+    
 
 def _inline_write_recursive_nodes(in_serialized_names, in_children, bone_name, indent):
     my_children = in_children[bone_name]
@@ -266,7 +276,7 @@ class DecoratedBone:
         else:
             return "[\"%s\" root bone]\n" % (self.name)
 
-def export_animations(objs):
+def export_animation_dict(objs):
     ### this animation export code see addons_core/io_anim_bvh/export_bvh.py
     scene = bpy.context.scene
     frame_current = scene.frame_current
@@ -280,19 +290,22 @@ def export_animations(objs):
     print("Frames: %d" % (frame_end - frame_start + 1))
     print("Frame Time: %.6f\n" % (1.0 / (scene.render.fps / scene.render.fps_base)))
 
+    frame_num = frame_end - frame_start + 1
     frame_time = (1.0 / (scene.render.fps / scene.render.fps_base))
+    frame_times = frame_num * frame_time
 
     global_scale=1.0
     rotate_mode='NATIVE'
     root_transform_only=False
     sort_children_by_names=False
 
-    tmp_animations = {}
+    tmp_animations = []
 
     for obj in objs:
         # print("=====>", obj.name, obj.type)
         if obj.type == 'ARMATURE':
             obj_name = obj.name
+            print(" anim:", obj.name)
             tmp_tracks = {}
             children = {None: []}
             serialized_names = []
@@ -369,19 +382,18 @@ def export_animations(objs):
                         pass
 
                     # print("{:%s} {:%d}, {:%.6f}"%(tmp_node_path,frame,degrees(rot[dbone.rot_order[2]])))
-                    # tmp_tracks[tmp_node_path_rot].append({"frame":(frame * frame_time), "values": degrees(rot[dbone.rot_order[2]])})
                     tmp_tracks[tmp_node_path_rot].append({"frame":(frame * frame_time), "values": (-rot[dbone.rot_order[2]])})
 
                     dbone.prev_euler = rot
 
                 # print("\n")
 
-            tmp_animations[obj.name] = tmp_tracks
+            tmp_animations.append({"name":obj.name, "values":tmp_tracks})
             # print(tmp_tracks)
 
     scene.frame_set(frame_current)
 
-    return tmp_animations
+    return {"times":frame_times, "anims":tmp_animations, "num":len(tmp_animations)}
 
 # creates a popup based on it's arguments
 def custom_message_box(message="", title="Message Box", icon='INFO'):

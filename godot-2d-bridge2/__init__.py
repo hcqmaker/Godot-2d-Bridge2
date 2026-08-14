@@ -25,6 +25,9 @@ from .gd2db_operators_and_properties import (
     GODOT_2D_BRIDGE_OT_export,
     GODOT_2D_BRIDGE_OT_2d_view,
 
+    Godot2dBridgeItemString,
+    GODOT_2D_BRIDGE_OT_list_export_objects,
+    GODOT_2D_BRIDGE_UL_ObjCollections,
     GODOT_2D_BRIDGE_OT_import_sprites,
     GODOT_2D_BRIDGE_OT_add_plane,
     GODOT_2D_BRIDGE_OT_add_armature,
@@ -89,6 +92,9 @@ classes = (
     GODOT_2D_BRIDGE_OT_export,
     GODOT_2D_BRIDGE_OT_2d_view,
 
+    Godot2dBridgeItemString,
+    GODOT_2D_BRIDGE_OT_list_export_objects,
+    GODOT_2D_BRIDGE_UL_ObjCollections,
     GODOT_2D_BRIDGE_OT_import_sprites,
     GODOT_2D_BRIDGE_OT_add_plane,
     GODOT_2D_BRIDGE_OT_add_armature,

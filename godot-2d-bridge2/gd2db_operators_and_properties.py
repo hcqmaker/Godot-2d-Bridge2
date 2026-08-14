@@ -17,6 +17,7 @@ from bpy.props import (
     StringProperty,
     BoolProperty,
     EnumProperty,
+    CollectionProperty,
 )
 
 from bpy_extras.io_utils import (
@@ -36,7 +37,7 @@ from .gd2db_utilities import (
 
 from .gd2db_2d_constraints import remove_all_constraints
 from .gd2db_scene_parsing import write_godot_scene,write_godot_scene_47
-from .gd2db_utilities import export_objects, custom_message_box
+from .gd2db_utilities import export_objects, custom_message_box, list_export_objects
 
 
 # returns list of enumerator property items containing the name of empties within the scene that display images and
@@ -57,6 +58,15 @@ def available_references(_self, context):
             reference_property_list.append((ref.name, ref.name, f"{ref}"))
         return reference_property_list
 
+
+### Custom template_list look
+class GODOT_2D_BRIDGE_UL_ObjCollections(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
+        col = layout.row(align=True)
+        col.label(text=item.name)
+
+class Godot2dBridgeItemString(PropertyGroup):
+    name: StringProperty(default='')
 
 class Godot2dBridgeProperties(PropertyGroup):
 
@@ -112,6 +122,9 @@ class Godot2dBridgeProperties(PropertyGroup):
         description="Chose the version of Godot to export the scene for",
         default="7"
     )
+
+    export_objs: CollectionProperty(type=Godot2dBridgeItemString)
+    export_idx: IntProperty(default=-1)
 
     export_root: StringProperty(
         name="",
@@ -406,8 +419,21 @@ class GODOT_2D_BRIDGE_OT_2d_object_toggle(Operator):
         context.view_layer.objects.active = active_object
         if not any((x.gd2db_object_2d for x in bpy.data.objects)):
             remove_all_constraints()
+
+        list_export_objects()
+
         return {'FINISHED'}
 
+# update export list
+class GODOT_2D_BRIDGE_OT_list_export_objects(Operator):
+    bl_label = "Export Objects List"
+    bl_idname = "gd2db.list_export_objects"
+    bl_options = {'REGISTER', }
+    bl_description = "list all export objects"
+
+    def execute(self, context):
+        list_export_objects()
+        return {'FINISHED'}
 
 # exports objects and collections based on user defined parameters
 # noinspection PyPep8Naming
@@ -746,6 +772,7 @@ class GODOT_2D_BRIDGE_OT_import_sprites(Operator, ImportHelper):
                             Vector((pos[0], -pos[1], pos[2])) * tmp_scale * 0.5 +
                             Vector((offset[0], offset[1], offset[2])) * tmp_scale * 0.5
                         )
+                        pos_offset[2] = pos[2] * tmp_scale
 
                         img_obj.empty_display_size = final_display_size
                         img_obj.empty_image_offset = [0, -1]
