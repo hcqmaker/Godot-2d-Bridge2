@@ -383,28 +383,28 @@ class GODOT_2D_BRIDGE_OT_2d_object_toggle(Operator):
 
                     # change the active object to the armature and put it in edit mode
                     context.view_layer.objects.active = obj
-                    bpy.ops.object.mode_set(mode='EDIT')
+                    # bpy.ops.object.mode_set(mode='EDIT')
 
-                    edit_bones = obj.data.edit_bones
-                    for bone in edit_bones:
+                    # edit_bones = obj.data.edit_bones
+                    # for bone in edit_bones:
 
-                        # get the x/y coordinates of the head and tail of the edit bone and check if they're the same
-                        # if they are the bone is rotated 90 degrees to prevent removing the bone when the z coordinates
-                        # are zeroed
-                        bone_head_x_y = bone.head.x, bone.head.y
-                        bone_tail_x_y = bone.tail.x, bone.tail.y
-                        if bone_head_x_y == bone_tail_x_y:
-                            bone_point = bone.head.x, bone.head.z
-                            new_tail_x_z = rotate_around_point((bone.tail.x, bone.tail.z), radians(90), bone_point)
-                            bone.tail.x, bone.tail.z = new_tail_x_z
+                    #     # get the x/y coordinates of the head and tail of the edit bone and check if they're the same
+                    #     # if they are the bone is rotated 90 degrees to prevent removing the bone when the z coordinates
+                    #     # are zeroed
+                    #     bone_head_x_y = bone.head.x, bone.head.y
+                    #     bone_tail_x_y = bone.tail.x, bone.tail.y
+                    #     if bone_head_x_y == bone_tail_x_y:
+                    #         bone_point = bone.head.x, bone.head.z
+                    #         # new_tail_x_z = rotate_around_point((bone.tail.x, bone.tail.z), radians(90), bone_point)
+                    #         # bone.tail.x, bone.tail.z = new_tail_x_z
 
-                        # 0 the head, tail, and roll
-                        bone.head.z = 0
-                        bone.tail.z = 0
-                        bone.roll = 0
+                    #     # 0 the head, tail, and roll
+                    #     bone.head.z = 0
+                    #     bone.tail.z = 0
+                    #     bone.roll = 0
 
-                    # reset the mode to object mode
-                    bpy.ops.object.mode_set(mode='OBJECT')
+                    # # reset the mode to object mode
+                    # bpy.ops.object.mode_set(mode='OBJECT')
             else:
                 # remove the plugin related properties, the plugin will no longer recognize this object as a "2d" object
                 # and all locked properties can now be changed by the user
@@ -550,7 +550,7 @@ class GODOT_2D_BRIDGE_OT_add_plane(Operator):
     bl_description = "according sprite add plane"
 
     def execute(self, context: Context):
-        active_object = context.view_layer.objects.active
+        # active_object = context.view_layer.objects.active
 
         objects_to_apply = (
                     x for x in context.selected_objects
@@ -559,13 +559,16 @@ class GODOT_2D_BRIDGE_OT_add_plane(Operator):
         
         # create need panel
         for obj in objects_to_apply:
-            if not obj.gd2db_object_2d:
+            if obj.gd2db_object_2d:
                 pos = obj.location
                 tmp_plane_name = "ms_" + obj.name
                 bpy.ops.mesh.primitive_plane_add(location=(0,0, pos[2]))
                 tmp_plane = bpy.context.object
                 tmp_plane.name = tmp_plane_name
-        context.view_layer.objects.active = active_object
+
+                # _inline_link_object(tmp_plane)
+
+        # context.view_layer.objects.active = active_object
         return {'FINISHED'}
     
 class GODOT_2D_BRIDGE_OT_add_armature(Operator):
@@ -610,7 +613,7 @@ class GODOT_2D_BRIDGE_OT_add_armature(Operator):
                 # armature_object.dsiplay_fron
                 bone_obj = armature_object.edit_bones.active
                 bone_obj.tail = (0, 1, 0)
-                
+                # _inline_link_object(active_object)
         
         # bpy.ops.object.transform_apply(location=False, rotation=True, scale=False, properties=False)
         bpy.ops.object.mode_set(mode='OBJECT')

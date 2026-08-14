@@ -119,7 +119,7 @@ class GODOT_2D_BRIDGE_PT_export_panel_47(Panel):
         row = box.row(align=True)
         row.operator("gd2db.sprite_add_plane")
         if not any(
-                x.empty_display_type == 'IMAGE'
+                x.empty_display_type == 'IMAGE' and x.gd2db_object_2d
                 for x in context.selected_objects
         ) or context.mode != 'OBJECT':
             row.enabled = False

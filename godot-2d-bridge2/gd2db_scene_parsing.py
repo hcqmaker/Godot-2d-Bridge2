@@ -1177,6 +1177,7 @@ def write_godot_scene_47(root_path, new_file_path):
 
             # save the texture and parse the external resource if an image exists for this mesh
             if obj.gd2db_texture_image != "None":
+                print("----->", new_file_path)
                 object_parser.save_texture(new_file_path, parsing_instance, tmp_texture_root)
                 parsing_instance.append_external_resources(object_parser.external_resource())
 
