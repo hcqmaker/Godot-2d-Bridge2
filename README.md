@@ -15,5 +15,5 @@ Godot 2D Bridge 2
 
 ## How to Use?
 - [Photoshop export sprites Tutorial](tutorials/photoshop_export_sprites_tutorial.jpg)
-- [Image Tutorial](tutorials/blender_Godot-2d-Bridge2_tutorials.jpg)
+- [Godot 2D Bridge 2 use Tutorial](tutorials/blender_Godot-2d-Bridge2_tutorials.jpg)
 
