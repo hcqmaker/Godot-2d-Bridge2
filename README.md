@@ -14,4 +14,6 @@ Godot 2D Bridge 2
 > export include Node2D, Polygon2D, Skeleton2D
 
 ## How to Use?
+- [Photoshop export sprites Tutorial](tutorials/photoshop_export_sprites_tutorial.jpg)
+- [Image Tutorial](tutorials/blender_Godot-2d-Bridge2_tutorials.jpg)
 
