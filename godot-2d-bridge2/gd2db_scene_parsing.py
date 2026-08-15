@@ -467,8 +467,11 @@ class MeshObjectParser(ObjectToExport):
         self.existing_ids.append(self.resource_id)
 
         # change the image objects filepath and run the save function
+        old_filepath_raw = image.filepath_raw
         image.filepath_raw = image_filepath
         image.save()
+        # change back image filepath
+        image.filepath_raw = old_filepath_raw
 
     # returns the external resource string based on the values in self.resource_path and self.resource_id
     def external_resource(self):
