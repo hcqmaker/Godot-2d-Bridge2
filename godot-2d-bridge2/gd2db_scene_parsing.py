@@ -23,6 +23,8 @@ from .gd2db_utilities import (
     custom_message_box
     )
 
+def str_float(v):
+    return f"{v:.2f}"
 
 # Used to parse the elements of a scene
 class GodotSceneParser:
@@ -121,7 +123,7 @@ class GodotSceneParser:
     # adds a dictionary entry to elements["ext_resource"] of the supplied resource with the resource id as the key
     def append_external_resources(self, resource):
         # use re pattern matching to find the resource's id
-        pattern = re.compile(r"id=(\d+)")
+        pattern = re.compile(r"id=\"(\d+)\"")
         match = re.search(pattern, resource)
         resource_id = str(match.group(1))
 
@@ -475,7 +477,7 @@ class MeshObjectParser(ObjectToExport):
 
     # returns the external resource string based on the values in self.resource_path and self.resource_id
     def external_resource(self):
-        return f"[ext_resource type=\"Texture\" path=\"{self.resource_path}\"  id={self.resource_id}]"
+        return f"[ext_resource type=\"Texture2D\" path=\"{self.resource_path}\"  id=\"{self.resource_id}\"]"
 
     # returns a map of the indexes of vertices in blender to the index of those vertices expected in Godot
     def _vertex_map_and_internal_vertex_count(self):
@@ -534,8 +536,9 @@ class MeshObjectParser(ObjectToExport):
         for polygon in self.obj.data.polygons:
             self._update_reporting_instance()
             # rebuild the list of vertex indices within the polygon using the vertex_index_map
-            polygon_vertices = [str(vertex_index_map[vertex]) for vertex in polygon.vertices]
-            polygons.append(f"{self.int_array_key}( {', '.join(polygon_vertices)} )")
+            polygon_vertices = [str_float(vertex_index_map[vertex]) for vertex in polygon.vertices]
+            polygons.append(f"{self.int_array_key}({', '.join(polygon_vertices)})")
+            # polygons.append(f"[{', '.join(polygon_vertices)}]")
         self._end_reporting_instance()
         return ", ".join(polygons)
 
@@ -607,7 +610,7 @@ class MeshObjectParser(ObjectToExport):
         bone_weights = ", ".join(
             (
                 f"\"{bone_hierarchy(self.linked_armature.pose.bones[bone_name])}\", "
-                f"{self.float_array_key}( {', '.join(bone_weights[bone_name])} )"
+                f"{self.float_array_key}({', '.join(bone_weights[bone_name])})"
                 for bone_name in bone_weights
             )
         )
@@ -639,7 +642,7 @@ class MeshObjectParser(ObjectToExport):
         vertex_index_map, internal_vertex_count = self._vertex_map_and_internal_vertex_count()
         vertex_coordinates, bone_weights, uv_coordinates = self._vertex_relative_data(vertex_index_map)
         location, rotation, scale = self._relative_object_transforms()
-        z_index = -ceil(abs(self.mesh_obj.location[2]) * pixels_per_unit)
+        z_index = round(self.mesh_obj.location[2] * pixels_per_unit)
         # print("--===>", pixels_per_unit, self.mesh_obj.location[2], self.mesh_obj.location[2] * pixels_per_unit, z_index)
 
         # remove references to internal vertices for Godot 3.0 and earlier
@@ -649,33 +652,33 @@ class MeshObjectParser(ObjectToExport):
             polygons_line = ""
             internal_vertex_line = ""
         else:
-            polygons_line = f"polygons = [ {self._polygons(vertex_index_map)} ]\n"
+            polygons_line = f"polygons = [{self._polygons(vertex_index_map)}]\n"
             internal_vertex_line = f"internal_vertex_count = {internal_vertex_count}\n"
 
         # get lines for the linked armature if one is recognized
         if self.linked_armature is not None:
             skeleton_line = f"skeleton = NodePath(\"{self._skeleton_hierarchy()}\")\n"
-            bones_line = f"bones = [ {bone_weights} ]\n"
+            bones_line = f"bones = [{bone_weights}]\n"
         else:
             skeleton_line = ""
             bones_line = ""
 
         # get the texture reference if a texture is associated with this mesh
         if self.resource_id:
-            texture_line = f"{self.texture_key} = ExtResource( {self.resource_id} )\n"
+            texture_line = f"{self.texture_key} = ExtResource(\"{self.resource_id}\")\n"
         else:
             texture_line = ""
 
         return (
             f"[node name=\"{self.obj.name}\" type=\"Polygon2D\" parent=\"{self.parent_string}\"]\n"
-            f"z_index = {z_index} \n"
+            f"z_index = {z_index}\n"
             f"{texture_line}"
-            f"{self.position_key} = Vector2( {location} )\n"
+            f"{self.position_key} = Vector2({location})\n"
             f"{self.rotation_key} = {rotation}\n"
-            f"{self.scale_key} = Vector2( {scale} )\n"
+            f"{self.scale_key} = Vector2({scale})\n"
             f"{skeleton_line}"
-            f"polygon = {self.vector_array_key}( {', '.join(vertex_coordinates)} )\n"
-            f"uv = {self.vector_array_key}( {', '.join(uv_coordinates)} )\n"
+            f"polygon = {self.vector_array_key}({', '.join(vertex_coordinates)})\n"
+            f"uv = {self.vector_array_key}({', '.join(uv_coordinates)})\n"
             f"{polygons_line}"
             f"{bones_line}"
             f"{internal_vertex_line}"
@@ -692,9 +695,9 @@ class ArmatureObjectParser(ObjectToExport):
         location, rotation, scale = self._relative_object_transforms()
         return (
             f"[node name=\"{self.obj.name}\" type=\"Skeleton2D\" parent=\"{self.parent_string}\"]\n"
-            f"{self.position_key} = Vector2( {location} )\n"
+            f"{self.position_key} = Vector2({location})\n"
             f"{self.rotation_key} = {rotation}\n"
-            f"{self.scale_key} = Vector2( {scale} )\n"
+            f"{self.scale_key} = Vector2({scale})\n"
         )
 
     # returns the node string for the Bone2D node of a bone in this armature
@@ -792,7 +795,7 @@ class ArmatureObjectParser(ObjectToExport):
         #   1.0   0.0   ox
         #   0.0   1.0   oy
         rest_pose = ",".join([
-            str(x) for x in (1, 0, 0, 1,
+            str_float(x) for x in (1, 0, 0, 1,
             location_at_rest[0], location_at_rest[1])
         ])
         
@@ -813,12 +816,15 @@ class ArmatureObjectParser(ObjectToExport):
             auto_calculate_line = ""
             angle_line = ""
 
+        ### !!!!!!!!! Rotation is error here set to 0.0
+        current_angle = 0.0
+
         return (
             f"[node name=\"{pose_bone.name}\" type=\"Bone2D\" parent=\"{parents}\"]\n"
-            f"{self.position_key} = Vector2( {current_position[0]}, {current_position[1]} )\n"
+            f"{self.position_key} = Vector2({current_position[0]}, {current_position[1]} )\n"
             f"{self.rotation_key} = {current_angle}\n"
-            f"{self.scale_key} = Vector2( {pose_bone.scale.x}, {pose_bone.scale.y} )\n"
-            f"rest = Transform2D( {rest_pose} )\n"
+            f"{self.scale_key} = Vector2({pose_bone.scale.x}, {pose_bone.scale.y})\n"
+            f"rest = Transform2D({rest_pose})\n"
             f"{auto_calculate_line}"
             f"{self.bone_length_key} = {pose_bone.length * self.pixels}\n"
             f"{angle_line}"
@@ -883,11 +889,11 @@ class AnimationsParser():
                 frame = frame_obj["frame"]
                 vals = frame_obj["values"]
                 
-                frame_times.append("{:.3f}".format(frame))
+                frame_times.append(str_float(frame))
                 if is_location:
-                    frame_values.append(f"Vector2({vals[0]}, {vals[1]})")
+                    frame_values.append(f"Vector2({str_float(vals[0])}, {str_float(vals[1])})")
                 else:
-                    frame_values.append(str(vals))
+                    frame_values.append(str_float(vals))
                 trans.append('1')
 
 
@@ -1180,7 +1186,7 @@ def write_godot_scene_47(root_path, new_file_path):
 
             # save the texture and parse the external resource if an image exists for this mesh
             if obj.gd2db_texture_image != "None":
-                print("----->", new_file_path)
+                # print("----->", new_file_path)
                 object_parser.save_texture(new_file_path, parsing_instance, tmp_texture_root)
                 parsing_instance.append_external_resources(object_parser.external_resource())
 
