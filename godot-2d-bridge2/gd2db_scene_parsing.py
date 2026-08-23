@@ -1,5 +1,5 @@
 import bpy
-import re
+import re,random
 import os
 import bmesh
 import hashlib, time
@@ -1099,7 +1099,7 @@ def write_godot_scene(new_file_path):
 
 
 def _inline_get_key():
-    dt = int(time.time() * 1000)
+    dt = int(time.time() * 1000 + random.random() * 1000)
     return hashlib.md5(str(dt).encode(encoding='UTF-8')).hexdigest()[:5]
 
 def write_godot_scene_47(root_path, new_file_path):
