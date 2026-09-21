@@ -369,9 +369,13 @@ def export_animation_dict(objs):
                     ### x,y,z, only need rotation y
                     tmp_node_path_rot = tmp_node_path + ":rotation"
                     tmp_node_path_loc = tmp_node_path + ":position"
+                    tmp_node_path_sca = tmp_node_path + ":scale"
 
                     if (not (tmp_node_path_rot in tmp_tracks)):
                             tmp_tracks[tmp_node_path_rot] = []
+
+                    if (not (tmp_node_path_sca in tmp_tracks)):
+                            tmp_tracks[tmp_node_path_sca] = []
 
                     if not dbone.skip_position:
                         if (not (tmp_node_path_loc in tmp_tracks)):
@@ -383,6 +387,9 @@ def export_animation_dict(objs):
 
                     # print("{:%s} {:%d}, {:%.6f}"%(tmp_node_path,frame,degrees(rot[dbone.rot_order[2]])))
                     tmp_tracks[tmp_node_path_rot].append({"frame":(frame * frame_time), "values": (-rot[dbone.rot_order[2]])})
+
+                    bone_scale = mat_final.decompose()[2]
+                    tmp_tracks[tmp_node_path_sca].append({"frame":(frame * frame_time), "values": [bone_scale[0], bone_scale[2]]})
 
                     dbone.prev_euler = rot
 

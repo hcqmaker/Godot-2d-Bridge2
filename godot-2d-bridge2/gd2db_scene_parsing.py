@@ -877,9 +877,9 @@ class AnimationsParser():
         for node_path in tmp_tracks:
             frames = tmp_tracks[node_path]
 
-            is_location = False
-            if ":position" in node_path:
-                is_location = True
+            is_vect2 = False
+            if ":position" in node_path or ":scale" in node_path:
+                is_vect2 = True
 
             frame_times = []
             frame_values = []
@@ -890,7 +890,7 @@ class AnimationsParser():
                 vals = frame_obj["values"]
                 
                 frame_times.append(str_float(frame))
-                if is_location:
+                if is_vect2:
                     frame_values.append(f"Vector2({str_float(vals[0])}, {str_float(vals[1])})")
                 else:
                     frame_values.append(str_float(vals))
@@ -900,7 +900,7 @@ class AnimationsParser():
             str_frame_times = '0'
             str_trans = '1'
             str_frame_values = '0.0'
-            if is_location:
+            if is_vect2:
                 str_frame_values = "Vector2(0.0, 0.0)"
 
             if len(frame_times) > 0:
