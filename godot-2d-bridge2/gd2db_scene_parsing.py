@@ -436,7 +436,7 @@ class MeshObjectParser(ObjectToExport):
 
     # will save the image that is currently named in the gd2db_texture_image property of the mesh object, if any, and
     # calculate the appropriate resource id for the external resource
-    def save_texture(self, scene_path, parsing_instance, root_path = None):
+    def save_texture(self, scene_path, parsing_instance, prefix_path = None):
 
         # get the image object, the full name of the image file, and calculate the filepath to save the image to
         image = bpy.data.images[self.obj.gd2db_texture_image]
@@ -447,9 +447,9 @@ class MeshObjectParser(ObjectToExport):
 
         # get the resource path string
         # used to check if the resource already exists in the scene and to parse new resource lines
-        if (root_path == None):
-            root_path = ''
-        self.resource_path = f"res://{root_path}GD2DB_textures/{image_filename}"
+        if (prefix_path == None):
+            prefix_path = ''
+        self.resource_path = f"res://{prefix_path}GD2DB_textures/{image_filename}"
 
         # check if the external resource already exists as a dictionary entry and assign the key to self.resource_id
         for key, value in parsing_instance.elements["ext_resource"].items():
@@ -1102,22 +1102,47 @@ def _inline_get_key():
     dt = int(time.time() * 1000 + random.random() * 1000)
     return hashlib.md5(str(dt).encode(encoding='UTF-8')).hexdigest()[:5]
 
-def write_godot_scene_47(root_path, new_file_path):
+def _in_get_godot_res_root(export_path):
+    godot_project_file = 'project.godot'
 
-    tmp_root_path = root_path.replace("\\","/")  + "/"
-    tmp_root_path = tmp_root_path.replace("//", "/")
-    tmp_new_file_path = new_file_path.replace("\\","/")
-    tmp_dir_path = os.path.dirname(tmp_new_file_path)
+    tmp_path = export_path
+    while True:
+        dest_path = os.path.join(tmp_path, godot_project_file)
+        if (os.path.isfile(dest_path)):
+            return tmp_path
+        
+        tmp_old_path = tmp_path
+        tmp_path = os.path.dirname(tmp_path)
+        if (tmp_path == tmp_old_path):
+            break
+
+    return ''
+
+def to_linux_path(path):
+    return path.replace("\\","/")
+
+
+def write_godot_scene_47(export_path, project_name):
+
+    if (".tscn" in project_name):
+        project_name = project_name.replace(".tscn", "")
+
+    tmp_export_fullname = to_linux_path(export_path + "/" + project_name + ".tscn")
+    tmp_export_path = to_linux_path(export_path)
+    tmp_root_path = _in_get_godot_res_root(tmp_export_path)
+
+    tmp_tex_prefix_path = ''
+
+    if (tmp_root_path != ''):
+        tmp_root_path = to_linux_path(tmp_root_path)
+        tmp_tex_prefix_path = tmp_export_path.replace(tmp_root_path, '') + "/"
+
     # tmp_all_in_one = True #bpy.context.scene.godot_2d_bridge_tools.all_in_one
 
-    tmp_texture_root = ''
-    if (tmp_root_path in tmp_dir_path):
-        tmp_texture_root = tmp_dir_path.replace(tmp_root_path, '') + "/"
-
-    print("===> out path:",tmp_dir_path)
+    print("===> out path:",tmp_export_path)
     print("    root path:", tmp_root_path)
-    print("    file path:", tmp_new_file_path)
-    print("   texture root:", tmp_texture_root)
+    print("    file path:", tmp_export_fullname)
+    print("   texture prefix:", tmp_tex_prefix_path)
     bpy.context.scene.godot_2d_bridge_tools.godot_version = "9"
 
 
@@ -1187,7 +1212,7 @@ def write_godot_scene_47(root_path, new_file_path):
             # save the texture and parse the external resource if an image exists for this mesh
             if obj.gd2db_texture_image != "None":
                 # print("----->", new_file_path)
-                object_parser.save_texture(new_file_path, parsing_instance, tmp_texture_root)
+                object_parser.save_texture(tmp_export_path, parsing_instance, tmp_tex_prefix_path)
                 parsing_instance.append_external_resources(object_parser.external_resource())
 
             # parse the Polygon2D node
@@ -1251,7 +1276,7 @@ def write_godot_scene_47(root_path, new_file_path):
         parsing_instance.append_animation_player(tmp_anim_object_parser.to_player())
 
     # parse the name of the new file, build the list of job titles, and calculate there totals
-    new_file = new_file_path.split(os.sep)[-1]
+    new_file = tmp_export_fullname.split(os.sep)[-1]
     sub_jobs = [
         "Sort and Finalize Resources",
         "Sort and Finalize Nodes",
@@ -1275,7 +1300,7 @@ def write_godot_scene_47(root_path, new_file_path):
     reporting_instance.start_sub_job()
 
     elements = [parsing_instance.parse_file_descriptor()] + sum(parsing_instance.elements.values(), [])
-    with open(new_file_path, "w") as new_godot_scene:
+    with open(tmp_export_fullname, "w") as new_godot_scene:
         for element in elements:
             reporting_instance.update()
             new_godot_scene.write(f"{element}\n")

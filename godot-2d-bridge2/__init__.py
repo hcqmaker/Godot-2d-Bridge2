@@ -34,7 +34,8 @@ from .gd2db_operators_and_properties import (
     GODOT_2D_BRIDGE_OT_add_bone,
     GODOT_2D_BRIDGE_OT_lock_pose_bones,
 
-    GODOT_2D_BRIDGE_OT_export_root,
+    GODOT_2D_BRIDGE_OT_export_path,
+    get_blender_file_name,
     GODOT_2D_BRIDGE_OT_export_47,
     GODOT_2D_BRIDGE_OT_clear,
     GODOT_2D_BRIDGE_OT_2d_object_toggle,
@@ -101,7 +102,7 @@ classes = (
     GODOT_2D_BRIDGE_OT_add_bone,
     GODOT_2D_BRIDGE_OT_lock_pose_bones,
 
-    GODOT_2D_BRIDGE_OT_export_root,
+    GODOT_2D_BRIDGE_OT_export_path,
     GODOT_2D_BRIDGE_OT_export_47,
     GODOT_2D_BRIDGE_OT_clear,
     GODOT_2D_BRIDGE_OT_2d_object_toggle,

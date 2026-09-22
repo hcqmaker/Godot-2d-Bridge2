@@ -140,10 +140,13 @@ class GODOT_2D_BRIDGE_PT_export_panel_47(Panel):
             row.enabled = False
             
         row = box.row(align=True)
-        row.label(text="Godot res:// Path:")
+        row.label(text="Godot res://xx Export Path:")
         row = box.row(align=True)
-        row.prop(context.scene.godot_2d_bridge_tools, "export_root")
-        row.operator("gd2db.export_root")
+        row.prop(context.scene.godot_2d_bridge_tools, "export_path")
+        row.operator("gd2db.export_path")
+        row = box.row(align=True)
+        row.label(text="Project Name:")
+        row.prop(context.scene.godot_2d_bridge_tools, "project_name")
         # row = box.row(align=True)
         # row.prop(context.scene.godot_2d_bridge_tools, "all_in_one")
         row = box.row(align=True)

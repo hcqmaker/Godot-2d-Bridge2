@@ -68,6 +68,7 @@ class GODOT_2D_BRIDGE_UL_ObjCollections(bpy.types.UIList):
 class Godot2dBridgeItemString(PropertyGroup):
     name: StringProperty(default='')
 
+
 class Godot2dBridgeProperties(PropertyGroup):
 
     pixels_per_unit: IntProperty(
@@ -126,11 +127,14 @@ class Godot2dBridgeProperties(PropertyGroup):
     export_objs: CollectionProperty(type=Godot2dBridgeItemString)
     export_idx: IntProperty(default=-1)
 
-    export_root: StringProperty(
+    export_path: StringProperty(
         name="",
         default="",
         description="export godot scene root use for operator path for texture"
     )
+
+    project_name: StringProperty(name="", default="", description="the name of project")
+
     all_in_one:BoolProperty(
         name="all animation in one",
         description="Export animation all in in one"
@@ -794,11 +798,18 @@ class GODOT_2D_BRIDGE_OT_import_sprites(Operator, ImportHelper):
 
         return {'FINISHED'}
 
-class GODOT_2D_BRIDGE_OT_export_root(Operator, ExportHelper):
-    bl_label = "Godot res:// Path"
-    bl_idname = "gd2db.export_root"
+
+def get_blender_file_name():
+    file_name = os.path.basename(bpy.data.filepath)
+    file_name = file_name.replace(".blend", "")
+    return file_name
+
+
+class GODOT_2D_BRIDGE_OT_export_path(Operator, ExportHelper):
+    bl_label = "Godot res:// Export Path"
+    bl_idname = "gd2db.export_path"
     bl_options = {'REGISTER', "UNDO"}
-    bl_description = "Chose path res://"
+    bl_description = "Chose path res:// to export"
 
     filename_ext = ""
     filter_glob: StringProperty(default="", options={'HIDDEN'})
@@ -809,17 +820,18 @@ class GODOT_2D_BRIDGE_OT_export_root(Operator, ExportHelper):
 
     def execute(self, context):
         # noinspection PyUnresolvedReferences
-        context.scene.godot_2d_bridge_tools.export_root = os.path.dirname(self.filepath)
+        context.scene.godot_2d_bridge_tools.export_path = os.path.dirname(self.filepath)
+        if (context.scene.godot_2d_bridge_tools.project_name == ''):
+            project_name = get_blender_file_name()
+            context.scene.godot_2d_bridge_tools.project_name = project_name
+
+
         return {'FINISHED'}
 
-class GODOT_2D_BRIDGE_OT_export_47(Operator, ExportHelper):
+class GODOT_2D_BRIDGE_OT_export_47(Operator):
     bl_label = "Export Godot 4.7"
     bl_idname = "gd2db.export_47"
     bl_description = "Export objects to a *.tscn file"
-
-    # set the filename extension and filter for ExportHelper
-    filename_ext = ".tscn"
-    filter_glob: StringProperty(default="*.tscn", options={'HIDDEN'})
 
     def execute(self, _context):
         # get the start time of the export process
@@ -827,8 +839,10 @@ class GODOT_2D_BRIDGE_OT_export_47(Operator, ExportHelper):
 
         # use the gd2db_scene_parsing module to write a new *.tscn file
         # noinspection PyUnresolvedReferences
-        tmp_root_path = _context.scene.godot_2d_bridge_tools.export_root
-        export_success = write_godot_scene_47(tmp_root_path, self.filepath)
+        
+        export_path = _context.scene.godot_2d_bridge_tools.export_path
+        project_name = _context.scene.godot_2d_bridge_tools.project_name
+        export_success = write_godot_scene_47(export_path, project_name)
 
         if export_success:
             # parse the list of exported objects
