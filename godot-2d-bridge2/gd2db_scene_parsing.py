@@ -443,8 +443,8 @@ class MeshObjectParser(ObjectToExport):
         image_filename = image.filepath.split(os.sep)[-1]
         # images are saved to their own folder to avoid overwriting images that may be in the same directory of the
         # scene, but still mitigates duplicates from multiple exports
-        image_filepath = os.sep.join(scene_path.split(os.sep)[0:-1] + ["GD2DB_textures"] + [image_filename])
-
+        image_filepath = os.sep.join(scene_path.split("/") + ["GD2DB_textures"] + [image_filename])
+     
         # get the resource path string
         # used to check if the resource already exists in the scene and to parse new resource lines
         if (prefix_path == None):
@@ -474,6 +474,7 @@ class MeshObjectParser(ObjectToExport):
         image.save()
         # change back image filepath
         image.filepath_raw = old_filepath_raw
+        print("image_filepath=", image_filepath)
 
     # returns the external resource string based on the values in self.resource_path and self.resource_id
     def external_resource(self):
@@ -1135,7 +1136,9 @@ def write_godot_scene_47(export_path, project_name):
 
     if (tmp_root_path != ''):
         tmp_root_path = to_linux_path(tmp_root_path)
-        tmp_tex_prefix_path = tmp_export_path.replace(tmp_root_path, '') + "/"
+        tmp_tex_prefix_path:str = tmp_export_path.replace(tmp_root_path, '') + "/"
+        if (tmp_tex_prefix_path.startswith("/")):
+            tmp_tex_prefix_path = tmp_tex_prefix_path[1:]
 
     # tmp_all_in_one = True #bpy.context.scene.godot_2d_bridge_tools.all_in_one
 
